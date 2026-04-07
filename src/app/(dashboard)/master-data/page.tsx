@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { ProgramClient } from './program-client'
 import { PeriodClient } from './period-client'
 
+export const dynamic = 'force-dynamic'
+
 export default async function MasterDataPage({
   searchParams,
 }: {

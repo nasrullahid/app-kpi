@@ -13,6 +13,9 @@ export function NavLinks() {
     // If we are at master data
     if (path === '/master-data' && pathname?.startsWith('/master-data')) return true
     
+    // If we are at input harian
+    if (path === '/input-harian' && pathname?.startsWith('/input-harian')) return true
+    
     return false
   }
 
@@ -27,6 +30,16 @@ export function NavLinks() {
         }`}
       >
         Dashboard
+      </Link>
+      <Link 
+        href="/input-harian" 
+        className={`h-16 flex items-center px-1 border-b-2 text-sm font-medium transition-colors ${
+          isActive('/input-harian') 
+            ? 'text-indigo-600 border-indigo-600' 
+            : 'text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300'
+        }`}
+      >
+        Pencapaian Harian
       </Link>
       <Link 
         href="/master-data" 

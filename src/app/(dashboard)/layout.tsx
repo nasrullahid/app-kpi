@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { logout } from '@/app/login/actions'
 import { NavLinks } from './nav-links'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -16,11 +18,18 @@ export default async function DashboardLayout({
   }
 
   // Get user profile
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
+
+  console.log("=== DIAGNOSTIC DBG ===")
+  console.log("User Email:", user.email)
+  console.log("User ID:", user.id)
+  console.log("Profile Data:", profile)
+  console.log("Profile Error:", profileError)
+  console.log("======================")
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
