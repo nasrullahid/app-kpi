@@ -23,23 +23,35 @@ export default async function InputHarianPage() {
     .eq('is_active', true)
     .order('name')
 
-  // 3. Fetch User's Past Inputs for the Active Period
+  // Fetch User Role
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
+
+  // 3. Fetch Past Inputs for the Active Period
   let pastInputs: any[] = []
   if (activePeriod) {
-    const { data } = await supabase
+    let query = supabase
       .from('daily_inputs')
       .select(`
         *,
         programs (
           name,
           target_type
+        ),
+        profiles (
+          name
         )
       `)
       .eq('period_id', activePeriod.id)
-      .eq('created_by', user.id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
+      
+    // If not admin, only fetch their own inputs
+    if (!isAdmin) {
+      query = query.eq('created_by', user.id)
+    }
     
+    const { data } = await query
     pastInputs = data || []
   }
 
@@ -79,6 +91,7 @@ export default async function InputHarianPage() {
               <InputFormClient 
                 programs={activePrograms} 
                 pastInputs={pastInputs} 
+                isAdmin={isAdmin}
               />
             ) : (
               <div className="text-center py-8">

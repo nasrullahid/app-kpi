@@ -8,9 +8,10 @@ import { formatRupiah } from '@/lib/utils'
 type Program = Database['public']['Tables']['programs']['Row']
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row'] & {
   programs: { name: string; target_type: 'quantitative' | 'qualitative' | 'hybrid' } | null
+  profiles?: { name: string } | null
 }
 
-export function InputFormClient({ programs, pastInputs }: { programs: Program[], pastInputs: DailyInput[] }) {
+export function InputFormClient({ programs, pastInputs, isAdmin }: { programs: Program[], pastInputs: DailyInput[], isAdmin?: boolean }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,8 +121,9 @@ export function InputFormClient({ programs, pastInputs }: { programs: Program[],
           <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
             <tr>
               <th className="px-6 py-4">Tanggal</th>
+              {isAdmin && <th className="px-6 py-4">Pengisi (PIC)</th>}
               <th className="px-6 py-4">Program</th>
-              <th className="px-6 py-4 text-center">Rp / User (Kuantitatif)</th>
+              <th className="px-6 py-4 text-center">Rupiah & User (% Harian)</th>
               <th className="px-6 py-4 text-center">Milestone (Kualitatif)</th>
               <th className="px-6 py-4 text-right">Aksi</th>
             </tr>
@@ -129,24 +131,47 @@ export function InputFormClient({ programs, pastInputs }: { programs: Program[],
           <tbody className="divide-y divide-slate-200 bg-white">
             {pastInputs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                <td colSpan={isAdmin ? 6 : 5} className="px-6 py-8 text-center text-slate-500">
                   Belum ada catatan pencapaian di periode ini.
                 </td>
               </tr>
             ) : (
-              pastInputs.map((input) => (
+              pastInputs.map((input) => {
+                const prog = programs.find(p => p.id === input.program_id)
+                const percentageHarian = (prog?.daily_target_rp && input.achievement_rp) 
+                  ? ((input.achievement_rp / prog.daily_target_rp) * 100).toFixed(1) 
+                  : null
+
+                return (
                 <tr key={input.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
                     {formatDateLabel(input.date)}
                   </td>
-                  <td className="px-6 py-4 text-slate-700 font-medium max-w-[200px] truncate" title={input.programs?.name}>
-                    {input.programs?.name || 'Program Terhapus'}
+                  {isAdmin && (
+                    <td className="px-6 py-4 text-slate-700 font-medium">
+                      {input.profiles?.name || 'Tidak Diketahui'}
+                    </td>
+                  )}
+                  <td className="px-6 py-4 font-medium max-w-[200px] align-top" title={input.programs?.name}>
+                    <div className="text-slate-700 truncate">{input.programs?.name || 'Program Terhapus'}</div>
+                    {input.notes && (
+                      <div className="mt-1.5 text-[10px] text-slate-500 italic bg-slate-50 p-1.5 rounded border border-slate-100 whitespace-normal leading-tight">
+                        <span className="font-semibold not-italic">Catatan:</span> {input.notes}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center text-slate-700">
                     {(input.programs?.target_type === 'quantitative' || input.programs?.target_type === 'hybrid') ? (
-                      <div className="flex flex-col text-xs">
-                        <span>{formatRupiah(Number(input.achievement_rp || 0))}</span>
-                        <span className="text-slate-500">{input.achievement_user || 0} user</span>
+                      <div className="flex flex-col text-xs items-center gap-1">
+                        <span className="font-bold">{formatRupiah(Number(input.achievement_rp || 0))}</span>
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="text-slate-500">{input.achievement_user || 0} user</span>
+                          {percentageHarian && (
+                            <span className={`px-1.5 rounded-sm font-bold ${Number(percentageHarian) >= 100 ? 'bg-emerald-100 text-emerald-700' : Number(percentageHarian) >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                              {percentageHarian}% Target
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ) : ( <span className="text-slate-400">-</span> )}
                   </td>
@@ -174,7 +199,8 @@ export function InputFormClient({ programs, pastInputs }: { programs: Program[],
                     </div>
                   </td>
                 </tr>
-              ))
+              )
+            })
             )}
           </tbody>
         </table>

@@ -8,7 +8,17 @@ import { formatRupiah } from '@/lib/utils'
 type Program = Database['public']['Tables']['programs']['Row']
 type TargetType = Database['public']['Enums']['target_type']
 
-export function ProgramClient({ programs, isAdmin, activePeriod }: { programs: Program[], isAdmin: boolean, activePeriod?: any }) {
+export function ProgramClient({ 
+  programs, 
+  isAdmin, 
+  activePeriod,
+  picProfiles
+}: { 
+  programs: Program[], 
+  isAdmin: boolean, 
+  activePeriod?: any,
+  picProfiles?: { id: string, name: string, whatsapp_number: string | null }[]
+}) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProgramId, setEditingProgramId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -68,11 +78,15 @@ export function ProgramClient({ programs, isAdmin, activePeriod }: { programs: P
     
     const formData = new FormData(e.currentTarget)
     
+    const submittedPicId = formData.get('pic_id') as string
+    const selectedProfile = picProfiles?.find(p => p.id === submittedPicId)
+
     // Base data
     const payload: Parameters<typeof createProgram>[0] = {
       name: formData.get('name') as string,
-      pic_name: formData.get('pic_name') as string,
-      pic_whatsapp: formData.get('pic_whatsapp') as string,
+      pic_id: selectedProfile ? selectedProfile.id : null,
+      pic_name: selectedProfile ? selectedProfile.name : '',
+      pic_whatsapp: selectedProfile ? selectedProfile.whatsapp_number : null,
       target_type: selectedTargetType,
     }
 
@@ -298,28 +312,24 @@ export function ProgramClient({ programs, isAdmin, activePeriod }: { programs: P
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Penanggung Jawab (PIC)</label>
-                  <input 
-                    name="pic_name" 
-                    type="text" 
-                    required 
-                    defaultValue={editingProgramId ? programs.find(p=>p.id===editingProgramId)?.pic_name : ''}
-                    placeholder="Nama PIC"
-                    className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">No. WhatsApp PIC</label>
-                  <input 
-                    name="pic_whatsapp" 
-                    type="text" 
-                    defaultValue={editingProgramId ? programs.find(p=>p.id===editingProgramId)?.pic_whatsapp || '' : ''}
-                    placeholder="081234..."
-                    className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Tugaskan PIC (Penanggung Jawab)</label>
+                <select 
+                  name="pic_id" 
+                  required 
+                  defaultValue={editingProgramId ? programs.find(p=>p.id===editingProgramId)?.pic_id || '' : ''}
+                  className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="" disabled>-- Pilih Akun PIC --</option>
+                  {picProfiles && picProfiles.length > 0 ? (
+                    picProfiles.map(profile => (
+                      <option key={profile.id} value={profile.id}>{profile.name} {profile.whatsapp_number ? `(${profile.whatsapp_number})` : ''}</option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Belum ada user ber-role PIC terdaftar</option>
+                  )}
+                </select>
+                <p className="text-[10px] text-slate-500">Pilih dari daftar User yang memiliki Role sebagai "PIC". (Nama PIC dan No WA akan disalin otomatis).</p>
               </div>
 
               <div className="border-t border-slate-100 pt-4 mt-2">

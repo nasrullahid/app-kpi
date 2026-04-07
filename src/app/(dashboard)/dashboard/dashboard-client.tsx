@@ -145,6 +145,39 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, isAdmin }
   const totalAchievementRp = aggregatedData.reduce((sum, p) => sum + p.cumulative_rp, 0)
   const globalPercentage = totalTargetRp > 0 ? (totalAchievementRp / totalTargetRp) * 100 : 0
 
+  // Custom Tooltip component for Recharts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-xl border border-slate-200 min-w-[240px]">
+          <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center gap-4">
+               <span className="text-xs font-semibold text-slate-500">Target Bulan Ini</span>
+               <span className="text-sm font-bold text-slate-700">{formatRupiah(data.Target)}</span>
+            </div>
+            <div className="flex justify-between items-center gap-4">
+               <span className="text-xs font-semibold text-slate-500">Total Pencapaian</span>
+               <span className="text-sm font-bold text-indigo-600">{formatRupiah(data.Pencapaian)}</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
+              <span className="text-xs font-semibold text-slate-500">Status Capaian</span>
+              <span className={`text-xs font-bold px-2 py-1 rounded inline-block ${
+                data.percentage >= 100 ? 'bg-emerald-100 text-emerald-800' :
+                data.percentage >= 50 ? 'bg-amber-100 text-amber-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {data.percentage.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-8">
       
@@ -192,11 +225,9 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, isAdmin }
                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                  <YAxis tickFormatter={formatYAxis} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                  <Tooltip 
-                   formatter={(value: number) => formatRupiah(value)}
+                   content={<CustomTooltip />}
                    cursor={{ fill: '#f8fafc' }}
-                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                  />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }}/>
                  <Bar dataKey="Target" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
                  <Bar dataKey="Pencapaian" radius={[4, 4, 0, 0]} barSize={40}>
                    {chartData.map((entry, index) => (
@@ -208,6 +239,29 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, isAdmin }
                  </Bar>
                </BarChart>
              </ResponsiveContainer>
+          </div>
+          
+          {/* Custom Chart Legend */}
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-2 pt-4 border-t border-slate-100">
+             <div className="flex items-center gap-2">
+               <div className="w-4 h-4 rounded-sm bg-[#cbd5e1]"></div>
+               <span className="text-xs font-semibold text-slate-600 uppercase">Target (Bulan Ini)</span>
+             </div>
+             <div className="flex items-center gap-2 border-l border-slate-200 pl-6">
+               <span className="text-xs font-semibold text-slate-600 uppercase mr-1">Status Pencapaian:</span>
+               <div className="flex items-center gap-1.5">
+                 <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+                 <span className="text-[11px] text-slate-500">Perlu Perhatian</span>
+               </div>
+               <div className="flex items-center gap-1.5 ml-2">
+                 <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+                 <span className="text-[11px] text-slate-500">Menuju Target</span>
+               </div>
+               <div className="flex items-center gap-1.5 ml-2">
+                 <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                 <span className="text-[11px] text-slate-500">Tercapai / Lampaui</span>
+               </div>
+             </div>
           </div>
         </div>
       )}

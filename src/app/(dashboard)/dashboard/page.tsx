@@ -16,11 +16,10 @@ export default async function DashboardPage() {
   // 2. Active Period
   const { data: activePeriod } = await supabase.from('periods').select('*').eq('is_active', true).single()
 
-  // 3. Programs
   let programsQuery = supabase.from('programs').select('*').eq('is_active', true)
-  if (!isAdmin && profile?.name) {
-    // PIC can only see their own programs (soft filter based on pic_name matching profile name)
-    programsQuery = programsQuery.ilike('pic_name', `%${profile.name}%`)
+  if (!isAdmin && user) {
+    // PIC can only see their own programs based on assigned pic_id
+    programsQuery = programsQuery.eq('pic_id', user.id)
   }
   const { data: programs } = await programsQuery
 

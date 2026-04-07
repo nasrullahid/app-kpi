@@ -12,8 +12,9 @@ export type ActionResponse = { error: string } | { success: boolean; data?: any 
 
 export async function createProgram(data: {
   name: string
+  pic_id: string | null
   pic_name: string
-  pic_whatsapp?: string
+  pic_whatsapp?: string | null
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null
   monthly_target_user?: number | null
@@ -61,8 +62,9 @@ export async function toggleProgramStatus(id: string, currentStatus: boolean): P
 
 export async function updateProgram(id: string, data: {
   name: string
+  pic_id: string | null
   pic_name: string
-  pic_whatsapp?: string
+  pic_whatsapp?: string | null
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null
   monthly_target_user?: number | null

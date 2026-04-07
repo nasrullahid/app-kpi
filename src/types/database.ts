@@ -42,6 +42,7 @@ export interface Database {
         Row: {
           id: string
           name: string
+          pic_id: string | null
           pic_name: string
           pic_whatsapp: string | null
           target_type: 'quantitative' | 'qualitative' | 'hybrid'
@@ -56,6 +57,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
+          pic_id?: string | null
           pic_name: string
           pic_whatsapp?: string | null
           target_type?: 'quantitative' | 'qualitative' | 'hybrid'
@@ -70,6 +72,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
+          pic_id?: string | null
           pic_name?: string
           pic_whatsapp?: string | null
           target_type?: 'quantitative' | 'qualitative' | 'hybrid'

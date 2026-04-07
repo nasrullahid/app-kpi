@@ -31,6 +31,12 @@ export default async function MasterDataPage({
     .order('year', { ascending: false })
     .order('month', { ascending: false })
 
+  const { data: picProfiles } = await supabase
+    .from('profiles')
+    .select('id, name, whatsapp_number')
+    .eq('role', 'pic')
+    .order('name', { ascending: true })
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -78,6 +84,7 @@ export default async function MasterDataPage({
               programs={programs || []} 
               isAdmin={isAdmin} 
               activePeriod={periods?.find(p => p.is_active)}
+              picProfiles={picProfiles || []}
             />
           )}
         </div>
