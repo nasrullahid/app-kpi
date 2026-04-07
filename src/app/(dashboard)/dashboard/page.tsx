@@ -1,73 +1,81 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/server'
+import { DashboardClient } from './dashboard-client'
 
-export default function DashboardPage() {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h2>
-        <p className="text-slate-500">Ringkasan pencapaian dan target bulan ini.</p>
-      </div>
+export const dynamic = 'force-dynamic'
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Placeholder cards for Phase 1 Step 1 */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 text-slate-600 pb-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide">
-              Total Target Rp
-            </CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-4 w-4 text-indigo-500"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">---</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">April 2026</p>
-          </CardContent>
-        </Card>
+export default async function DashboardPage() {
+  const supabase = createClient()
+  
+  // 1. Session and Profile
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 text-slate-600 pb-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide">
-              Pencapaian Rp
-            </CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-4 w-4 text-indigo-500"
-            >
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">---</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">---% dari target</p>
-          </CardContent>
-        </Card>
-      </div>
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
+
+  // 2. Active Period
+  const { data: activePeriod } = await supabase.from('periods').select('*').eq('is_active', true).single()
+
+  // 3. Programs
+  let programsQuery = supabase.from('programs').select('*').eq('is_active', true)
+  if (!isAdmin && profile?.name) {
+    // PIC can only see their own programs (soft filter based on pic_name matching profile name)
+    programsQuery = programsQuery.ilike('pic_name', `%${profile.name}%`)
+  }
+  const { data: programs } = await programsQuery
+
+  // 4. Daily Inputs
+  let dailyInputs: any[] = []
+  if (activePeriod && programs && programs.length > 0) {
+    const programIds = programs.map(p => p.id)
+    const { data: inputs } = await supabase
+      .from('daily_inputs')
+      .select('*')
+      .eq('period_id', activePeriod.id)
+      .in('program_id', programIds)
+      .order('date', { ascending: true }) // important for chronogical grouping
       
-      {/* We will build the actual data tables in the next step */}
-      <div className="mt-8 p-8 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center bg-slate-50 min-h-[300px]">
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-slate-700">Area Data (Tahap Berikutnya)</h3>
-          <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-            Di sini akan ditampilkan tabel pencapaian per program dari Supabase database.
+    dailyInputs = inputs || []
+  }
+
+  return (
+    <div className="space-y-6 mb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard Keuangan & Kinerja</h2>
+          <p className="text-slate-500">
+            Pantau progres kinerja {isAdmin ? 'perusahaan secara global' : `program Anda (${profile?.name})`}.
           </p>
         </div>
+        
+        {activePeriod && (
+          <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl flex items-center gap-3">
+             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+             <div className="text-sm font-semibold text-indigo-900">
+               Bulan: {activePeriod.month} / {activePeriod.year} ({activePeriod.working_days} Hari Kerja)
+             </div>
+          </div>
+        )}
       </div>
+
+      {!activePeriod ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center text-amber-800">
+          <h3 className="font-bold text-lg mb-2">Belum Ada Periode Aktif</h3>
+          <p>Admin harus mengatur periode aktif terlebih dahulu di Master Data agar dashboard dapat menampilkan kalkulasi.</p>
+        </div>
+      ) : programs && programs.length > 0 ? (
+        <DashboardClient 
+          programs={programs} 
+          dailyInputs={dailyInputs} 
+          activePeriod={activePeriod}
+          isAdmin={isAdmin}
+        />
+      ) : (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-12 text-center text-slate-500">
+          <p className="font-medium text-lg">Tidak ada data program yang ditemukan.</p>
+          {!isAdmin && <p className="text-sm mt-2">Belum ada program aktif yang ditugaskan atas nama Anda.</p>}
+        </div>
+      )}
     </div>
   )
 }
