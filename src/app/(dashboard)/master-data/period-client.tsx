@@ -55,7 +55,7 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
         setIsModalOpen(false)
         setEditingPeriod(null)
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan sistem')
     } finally {
       setIsLoading(false)
@@ -75,7 +75,7 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
       } else {
         toast.success('Periode aktif berhasil diubah')
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal mengubah periode aktif')
     } finally {
       setIsLoading(false)
@@ -95,7 +95,7 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
       } else {
         toast.success('Periode berhasil dihapus')
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal menghapus periode')
     } finally {
       setIsLoading(false)
@@ -104,7 +104,7 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
 
   async function handleToggleLock(period: Period) {
     if (!isAdmin) return
-    const isLocked = (period as any).is_locked
+    const isLocked = (period as unknown as { is_locked: boolean | null }).is_locked
     const msg = isLocked 
       ? "Membuka kunci periode akan mengizinkan kembali pengeditan data harian. Lanjutkan?" 
       : "Mengunci periode akan mencegah siapapun mengedit atau menambah data harian di periode ini. Lanjutkan?"
@@ -113,13 +113,13 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
 
     setIsLoading(true)
     try {
-      const res = await togglePeriodLock(period.id, isLocked)
+      const res = await togglePeriodLock(period.id, isLocked || false)
       if ('error' in res && res.error) {
         toast.error(res.error)
       } else {
         toast.success(isLocked ? 'Akses edit dibuka' : 'Periode berhasil dikunci')
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal mengubah status kunci')
     } finally {
       setIsLoading(false)
@@ -131,7 +131,7 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
           <span className="font-semibold text-slate-900">{formatMonth(period.month)} {period.year}</span>
-          {(period as any).is_locked && (
+          {(period as unknown as { is_locked: boolean | null }).is_locked && (
             <span title="Terkunci - Data tidak bisa diubah">
               <Lock className="h-3.5 w-3.5 text-amber-500" />
             </span>
@@ -169,14 +169,14 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
             <button
                onClick={() => handleToggleLock(period)}
                disabled={isLoading}
-               title={(period as any).is_locked ? "Buka Kunci" : "Kunci Periode"}
+               title={(period as unknown as { is_locked: boolean | null }).is_locked ? "Buka Kunci" : "Kunci Periode"}
                className={`p-1.5 rounded-md border transition-all ${
-                 (period as any).is_locked 
+                 (period as unknown as { is_locked: boolean | null }).is_locked 
                   ? 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100'
                   : 'text-slate-400 border-slate-200 hover:bg-slate-50 hover:text-slate-600'
                }`}
             >
-              {(period as any).is_locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              {(period as unknown as { is_locked: boolean | null }).is_locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
             </button>
             <button
               onClick={() => {

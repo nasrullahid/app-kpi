@@ -36,8 +36,16 @@ type AggregatedProgram = Program & {
   business_status: 'PERLU PERHATIAN' | 'MENUJU TARGET' | 'TERCAPAI' | 'TERLAMPAUI'
 }
 
+interface TooltipPayloadEntry {
+  payload: {
+    Target: number;
+    Pencapaian: number;
+    percentage: number;
+  };
+}
+
 // Custom Tooltip component for Program Bar Chart
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -69,8 +77,12 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   return null;
 };
 
+interface TrendPayloadEntry {
+  value: number;
+}
+
 // Tooltip for Daily Trend Chart
-const CustomTrendTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
+const CustomTrendTooltip = ({ active, payload, label }: { active?: boolean; payload?: TrendPayloadEntry[]; label?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-4 rounded-xl shadow-xl border border-slate-200 min-w-[200px] z-[9999]">

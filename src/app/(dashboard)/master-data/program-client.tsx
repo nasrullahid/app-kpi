@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 
 type Program = Database['public']['Tables']['programs']['Row']
 type TargetType = Database['public']['Enums']['target_type']
+type Period = Database['public']['Tables']['periods']['Row']
 
 export function ProgramClient({ 
   programs, 
@@ -17,7 +18,7 @@ export function ProgramClient({
 }: { 
   programs: Program[], 
   isAdmin: boolean, 
-  activePeriod?: any,
+  activePeriod: Period | null,
   picProfiles?: { id: string, name: string, whatsapp_number: string | null }[]
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -47,7 +48,7 @@ export function ProgramClient({
 
   const handleOpenEdit = (program: Program) => {
     setEditingProgramId(program.id)
-    setSelectedTargetType(program.target_type)
+    setSelectedTargetType(program.target_type || 'quantitative')
     setMonthlyRp(program.monthly_target_rp ? program.monthly_target_rp.toString() : '')
     setMonthlyUser(program.monthly_target_user ? program.monthly_target_user.toString() : '')
     
@@ -73,7 +74,7 @@ export function ProgramClient({
       } else {
         toast.success('Program berhasil dihapus!')
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan saat menghapus program')
     } finally {
       setIsLoading(false)
@@ -89,7 +90,7 @@ export function ProgramClient({
     const submittedPicId = formData.get('pic_id') as string
     const selectedProfile = picProfiles?.find(p => p.id === submittedPicId)
 
-    const payload: any = {
+    const payload: Partial<Program> = {
       name: formData.get('name') as string,
       pic_id: selectedProfile ? selectedProfile.id : null,
       pic_name: selectedProfile ? selectedProfile.name : '',
@@ -115,11 +116,24 @@ export function ProgramClient({
     }
 
     let res
+    const finalPayload = {
+      name: payload.name || '',
+      pic_id: payload.pic_id || null,
+      pic_name: payload.pic_name || '',
+      pic_whatsapp: payload.pic_whatsapp || null,
+      target_type: payload.target_type || 'quantitative',
+      monthly_target_rp: payload.monthly_target_rp || null,
+      monthly_target_user: payload.monthly_target_user || null,
+      daily_target_rp: payload.daily_target_rp || null,
+      daily_target_user: payload.daily_target_user || null,
+      qualitative_description: payload.qualitative_description || null,
+    }
+
     if (editingProgramId) {
       const { updateProgram } = await import('./actions')
-      res = await updateProgram(editingProgramId, payload)
+      res = await updateProgram(editingProgramId, finalPayload)
     } else {
-      res = await createProgram(payload)
+      res = await createProgram(finalPayload)
     }
     
     if ('error' in res && res.error) {
@@ -180,10 +194,11 @@ export function ProgramClient({
     )
   }
 
-  const getTypeLabel = (type: string) => {
+  const getTypeLabel = (type: string | null) => {
     if (type === 'quantitative') return 'Kuantitatif'
     if (type === 'qualitative') return 'Kualitatif'
-    return 'Hybrid'
+    if (type === 'hybrid') return 'Hybrid'
+    return 'Unknown'
   }
 
   return (
@@ -255,7 +270,7 @@ export function ProgramClient({
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => handleToggleStatus(prog.id, prog.is_active)}
+                          onClick={() => handleToggleStatus(prog.id, prog.is_active || false)}
                           disabled={isLoading}
                           className={`text-xs font-medium border px-2 py-1 rounded transition-colors ${
                             prog.is_active 
@@ -339,7 +354,7 @@ export function ProgramClient({
                     <option value="" disabled>Belum ada user ber-role PIC terdaftar</option>
                   )}
                 </select>
-                <p className="text-[10px] text-slate-500">Pilih dari daftar User yang memiliki Role sebagai "PIC".</p>
+                <p className="text-[10px] text-slate-500">Pilih dari daftar User yang memiliki Role sebagai &quot;PIC&quot;.</p>
               </div>
 
               <div className="border-t border-slate-100 pt-4 mt-2">

@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export type ActionResponse = { error: string } | { success: boolean; data?: any }
+export type ActionResponse = { error: string } | { success: boolean; data?: unknown }
 
 export async function submitDailyInput(data: {
   program_id: string
@@ -66,7 +66,7 @@ export async function updateDailyInput(id: string, data: {
     .eq('id', id)
     .single()
 
-  const isLocked = (currentInput?.periods as any)?.is_locked
+  const isLocked = (currentInput?.periods as unknown as { is_locked: boolean | null })?.is_locked
   if (isLocked) return { error: 'Periode untuk data ini sudah dikunci oleh Admin.' }
 
   // Must only update their own records (enforced by RLS as well as code check if needed)
@@ -98,7 +98,7 @@ export async function deleteDailyInput(id: string): Promise<ActionResponse> {
     .eq('id', id)
     .single()
 
-  const isLocked = (currentInput?.periods as any)?.is_locked
+  const isLocked = (currentInput?.periods as unknown as { is_locked: boolean | null })?.is_locked
   if (isLocked) return { error: 'Periode untuk data ini sudah dikunci oleh Admin.' }
 
   const { error } = await supabase

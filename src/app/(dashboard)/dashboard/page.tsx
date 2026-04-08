@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardClient } from './dashboard-client'
+import { Database } from '@/types/database'
+
+type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
+type Program = Database['public']['Tables']['programs']['Row']
 
 export const dynamic = 'force-dynamic'
 
@@ -24,9 +28,9 @@ export default async function DashboardPage() {
   const { data: programs } = await programsQuery
 
   // 4. Daily Inputs
-  let dailyInputs: any[] = []
-  if (activePeriod && programs && programs.length > 0) {
-    const programIds = programs.map(p => p.id)
+  let dailyInputs: DailyInput[] = []
+  if (activePeriod && programs && (programs as Program[]).length > 0) {
+    const programIds = (programs as Program[]).map((p: Program) => p.id)
     const { data: inputs } = await supabase
       .from('daily_inputs')
       .select('*')

@@ -33,7 +33,7 @@ export function InputFormClient({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedProgramId, setSelectedProgramId] = useState<string>(programs[0]?.id || '')
 
-  const isLocked = (activePeriod as any)?.is_locked
+  const isLocked = (activePeriod as unknown as { is_locked: boolean | null })?.is_locked
 
   // Get active program details for dynamic rendering
   const activeProgram = programs.find(p => p.id === selectedProgramId)
@@ -73,7 +73,7 @@ export function InputFormClient({
       } else {
         toast.success('Data berhasil dihapus!')
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal menghapus data')
     } finally {
       setIsLoading(false)
@@ -92,9 +92,9 @@ export function InputFormClient({
     
     const formData = new FormData(e.currentTarget)
     
-    const payload: any = {
-      date: formData.get('date'),
-      notes: formData.get('notes'),
+    const payload: Partial<DailyInput> = {
+      date: formData.get('date') as string,
+      notes: formData.get('notes') as string,
     }
 
     if (!editingId) {
@@ -110,15 +110,15 @@ export function InputFormClient({
 
     if (activeProgram?.target_type === 'qualitative' || activeProgram?.target_type === 'hybrid') {
       const status = formData.get('qualitative_status')
-      if (status) payload.qualitative_status = status
+      if (status) payload.qualitative_status = status as 'not_started' | 'in_progress' | 'completed'
     }
 
     try {
       let res;
       if (editingId) {
-        res = await updateDailyInput(editingId, payload)
+        res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
       } else {
-        res = await submitDailyInput(payload)
+        res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
       }
       
       if ('error' in res && res.error) {
@@ -128,7 +128,7 @@ export function InputFormClient({
         toast.success(editingId ? 'Data berhasil diperbarui!' : 'Pencapaian harian berhasil dicatat!')
         setIsModalOpen(false)
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan saat menyimpan data.')
     } finally {
       setIsLoading(false)

@@ -1,7 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
+import { Database } from '@/types/database'
 import { InputFormClient } from './input-form-client'
 
 export const dynamic = 'force-dynamic'
+
+type DailyInputWithDetails = Database['public']['Tables']['daily_inputs']['Row'] & {
+  programs: {
+    name: string;
+    target_type: Database['public']['Enums']['target_type'];
+  } | null;
+  profiles: {
+    name: string;
+  } | null;
+}
 
 export default async function InputHarianPage() {
   const supabase = createClient()
@@ -28,7 +39,7 @@ export default async function InputHarianPage() {
   const isAdmin = profile?.role === 'admin'
 
   // 3. Fetch Past Inputs for the Active Period
-  let pastInputs: any[] = []
+  let pastInputs: DailyInputWithDetails[] = []
   if (activePeriod) {
     let query = supabase
       .from('daily_inputs')

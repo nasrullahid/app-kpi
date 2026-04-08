@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // Define the type for the server actions response
-export type ActionResponse = { error: string } | { success: boolean; data?: any }
+export type ActionResponse = { error: string } | { success: boolean; data?: unknown }
 
 /**
  * PROGRAMS

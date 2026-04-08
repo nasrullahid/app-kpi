@@ -1,0 +1,35 @@
+
+> dashboard-keuangan@0.1.0 build
+> next build
+
+  Γû▓ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/9) ...
+   Generating static pages (2/9) 
+   Generating static pages (4/9) 
+   Generating static pages (6/9) 
+ Γ£ô Generating static pages (9/9)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+Γöî Γùï /                                    138 B          87.5 kB
+Γö£ Γùï /_not-found                          873 B          88.2 kB
+Γö£ ╞Æ /dashboard                           120 kB          216 kB
+Γö£ ╞Æ /input-harian                        4.46 kB         110 kB
+Γö£ Γùï /login                               2.58 kB        89.9 kB
+Γöö ╞Æ /master-data                         7.47 kB         113 kB
++ First Load JS shared by all            87.3 kB
+  Γö£ chunks/117-89ad8778847a7918.js       31.7 kB
+  Γö£ chunks/fd9d1056-307a36020502e7d7.js  53.6 kB
+  Γöö other shared chunks (total)          1.96 kB
+
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
