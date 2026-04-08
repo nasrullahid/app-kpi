@@ -15,6 +15,7 @@ import {
   AreaChart,
   Area
 } from 'recharts'
+import {ChartNoAxesColumn, ChartNoAxesCombined} from 'lucide-react'
 
 type Program = Database['public']['Tables']['programs']['Row']
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
@@ -246,9 +247,7 @@ export function DashboardClient({ programs, dailyInputs, activePeriod }: Dashboa
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Trend Chart */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-visible">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            📈 Tren Akumulasi Pencapaian Harian
-          </h3>
+          <span className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><ChartNoAxesCombined color="#000000" />Tren Akumulasi Pencapaian Harian</span>
           <div className="w-full h-[350px] overflow-visible">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyTrendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -299,9 +298,7 @@ export function DashboardClient({ programs, dailyInputs, activePeriod }: Dashboa
         {/* Bar Chart */}
         {chartData.length > 0 && (
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-visible">
-            <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-              📊 Capaian Program vs Target
-            </h3>
+            <span className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><ChartNoAxesColumn color="#000000" /> Capaian Program vs Target</span>
             <div className="w-full h-[350px] overflow-visible">
                <ResponsiveContainer width="100%" height="100%">
                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
