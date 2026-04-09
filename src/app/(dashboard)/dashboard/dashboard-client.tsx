@@ -38,6 +38,8 @@ interface DashboardClientProps {
 type AggregatedProgram = Program & {
   cumulative_rp: number
   cumulative_user: number
+  effective_target_rp: number
+  effective_target_user: number
   latest_qualitative_status: 'not_started' | 'in_progress' | 'completed' | null
   percentage_rp: number
   business_status: 'PERLU PERHATIAN' | 'MENUJU TARGET' | 'TERCAPAI' | 'TERLAMPAUI'
@@ -60,8 +62,8 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
         <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
         <div className="space-y-2">
           <div className="flex justify-between items-center gap-4">
-             <span className="text-xs font-semibold text-slate-500">Target Bulan Ini</span>
-             <span className="text-sm font-bold text-slate-700">{formatRupiah(data.Target)}</span>
+             <span className="text-xs font-semibold text-slate-500">Target (Pro-rata)</span>
+             <span className="text-sm font-bold text-slate-400">{formatRupiah(data.Target)}</span>
           </div>
           <div className="flex justify-between items-center gap-4">
              <span className="text-xs font-semibold text-slate-500">Total Pencapaian</span>
@@ -157,7 +159,21 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
   const startDate = dateRange?.from ? formatDate(dateRange.from, 'yyyy-MM-dd') : ''
   const endDate = dateRange?.to ? formatDate(dateRange.to, 'yyyy-MM-dd') : ''
 
-  // Data processing - Aggregate per Program
+  // 1. Calculate Pro-ration Factor
+  const daysInSelection = useMemo(() => {
+    if (isFilterActive && dateRange?.from && dateRange?.to) {
+      // difference in days
+      const diffTime = Math.abs(dateRange.to.getTime() - dateRange.from.getTime())
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    }
+    return activePeriod.working_days || 30
+  }, [isFilterActive, dateRange, activePeriod])
+
+  const prorationFactor = isFilterActive 
+    ? (daysInSelection / (activePeriod.working_days || 30)) 
+    : 1
+
+  // 2. Data processing - Aggregate per Program
   const aggregatedData: AggregatedProgram[] = useMemo(() => {
     return programs.map(prog => {
       const inputs = dailyInputs.filter(i => i.program_id === prog.id)
@@ -167,9 +183,13 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
       
       const latest_qualitative_status = inputs.length > 0 ? (inputs[inputs.length - 1].qualitative_status || 'not_started') : 'not_started'
 
+      // Calculate Pro-rated Targets
+      const effective_target_rp = (prog.monthly_target_rp || 0) * prorationFactor
+      const effective_target_user = (prog.monthly_target_user || 0) * prorationFactor
+
       let percentage_rp = 0
-      if (prog.monthly_target_rp && prog.monthly_target_rp > 0) {
-        percentage_rp = (cumulative_rp / prog.monthly_target_rp) * 100
+      if (effective_target_rp > 0) {
+        percentage_rp = (cumulative_rp / effective_target_rp) * 100
       }
 
       let business_status: AggregatedProgram['business_status'] = 'PERLU PERHATIAN'
@@ -188,12 +208,14 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
         ...prog,
         cumulative_rp,
         cumulative_user,
+        effective_target_rp,
+        effective_target_user,
         latest_qualitative_status,
         percentage_rp,
         business_status
       }
     })
-  }, [programs, dailyInputs])
+  }, [programs, dailyInputs, prorationFactor])
 
   // Filtering Logic
   const filteredData = useMemo(() => {
@@ -258,7 +280,7 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
       .filter(p => p.target_type === 'quantitative' || p.target_type === 'hybrid')
       .map(p => ({
         name: p.name.length > 20 ? p.name.substring(0, 20) + '...' : p.name,
-        Target: p.monthly_target_rp || 0,
+        Target: Math.round(p.effective_target_rp || 0),
         Pencapaian: p.cumulative_rp || 0,
         percentage: p.percentage_rp
       }))
@@ -291,7 +313,7 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
     return <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold leading-5 bg-rose-100 text-rose-800 border border-rose-200">❌ PERLU PERHATIAN</span>
   }
 
-  const totalTargetRp = aggregatedData.reduce((sum, p) => sum + (p.monthly_target_rp || 0), 0)
+  const totalTargetRp = aggregatedData.reduce((sum, p) => sum + (p.effective_target_rp || 0), 0)
   const totalAchievementRp = aggregatedData.reduce((sum, p) => sum + p.cumulative_rp, 0)
   const globalPercentage = totalTargetRp > 0 ? (totalAchievementRp / totalTargetRp) * 100 : 0
 
