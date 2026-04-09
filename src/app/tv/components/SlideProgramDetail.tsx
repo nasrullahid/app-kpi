@@ -10,7 +10,8 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  ReferenceLine
+  ReferenceLine,
+  LabelList
 } from 'recharts'
 
 interface SlideProgramDetailProps {
@@ -248,21 +249,28 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                            strokeWidth={4} 
                            fill="url(#colorAch)" 
                            animationDuration={2000}
-                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                           label={(props: any) => {
-                             const { x, y, value } = props;
-                             if (!value || value === 0) return null;
-                             const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
-                             return (
-                               <g transform={`translate(${x},${y})`}>
-                                 <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
-                                 <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
-                                   {formatted}
-                                 </text>
-                               </g>
-                             );
-                           }}
-                        />
+                        >
+                           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                           <LabelList 
+                              dataKey="pencapaian" 
+                              position="top" 
+                              offset={15}
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              content={(props: any) => {
+                                 const { x, y, value } = props;
+                                 if (value === undefined || value === null || value === 0) return null;
+                                 const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
+                                 return (
+                                    <g transform={`translate(${x},${y})`}>
+                                       <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
+                                       <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
+                                          {formatted}
+                                       </text>
+                                    </g>
+                                 );
+                              }}
+                           />
+                        </Area>
                         <Area 
                            type="monotone" 
                            dataKey="targetIdeal" 
@@ -335,40 +343,51 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                </div>
             </div>
 
-                <div className="flex-grow w-full">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartDataWithTarget} margin={{ top: 30, right: 10, left: 10, bottom: 0 }}>
-                         <defs>
-                            <linearGradient id="colorAchHybrid" x1="0" y1="0" x2="0" y2="1">
-                               <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                               <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                            </linearGradient>
-                         </defs>
-                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                         <XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
-                         <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax, program.monthly_target_rp || 0)]} />
-                         <Area 
-                            type="monotone" 
-                            dataKey="pencapaian" 
-                            stroke="#6366f1" 
-                            strokeWidth={4} 
-                            fill="url(#colorAchHybrid)"
-                            animationDuration={2000}
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            label={(props: any) => {
-                              const { x, y, value } = props;
-                              if (!value || value === 0) return null;
-                              const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
-                              return (
-                                <g transform={`translate(${x},${y})`}>
-                                  <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
-                                  <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
-                                    {formatted}
-                                  </text>
-                                </g>
-                              );
-                            }}
-                         />
+                <div className="col-span-8 bg-slate-900/40 rounded-3xl p-8 border border-slate-800/80 shadow-xl flex flex-col">
+                   <div className="flex justify-between items-center mb-8">
+                      <h3 className="text-2xl font-black text-slate-100 uppercase tracking-tighter">Performa Program Hybrid</h3>
+                   </div>
+                   <div className="flex-grow w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                         <AreaChart data={chartDataWithTarget} margin={{ top: 30, right: 10, left: 10, bottom: 0 }}>
+                            <defs>
+                               <linearGradient id="colorAchHybrid" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                               </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                            <XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
+                            <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax, program.monthly_target_rp || 0)]} />
+                            <Area 
+                               type="monotone" 
+                               dataKey="pencapaian" 
+                               stroke="#6366f1" 
+                               strokeWidth={4} 
+                               fill="url(#colorAchHybrid)"
+                               animationDuration={2000}
+                            >
+                               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                               <LabelList 
+                                  dataKey="pencapaian" 
+                                  position="top" 
+                                  offset={15}
+                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                  content={(props: any) => {
+                                     const { x, y, value } = props;
+                                     if (value === undefined || value === null || value === 0) return null;
+                                     const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
+                                     return (
+                                        <g transform={`translate(${x},${y})`}>
+                                           <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
+                                           <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
+                                              {formatted}
+                                           </text>
+                                        </g>
+                                     );
+                                  }}
+                               />
+                            </Area>
                          <Area 
                             type="monotone" 
                             dataKey="targetIdeal" 
@@ -386,6 +405,7 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                       </AreaChart>
                    </ResponsiveContainer>
                 </div>
+            </div>
           </>
         )}
       </div>
