@@ -32,6 +32,7 @@ export function SlidePICDetail({ pic, programs }: SlidePICDetailProps) {
   const chartData = programs.map(p => ({
     name: p.name,
     percentage: parseFloat(p.percentageRp.toFixed(1)),
+    achievementRp: p.achievementRp,
     color: getStatusColor(p.percentageRp)
   }))
 
@@ -130,9 +131,9 @@ export function SlidePICDetail({ pic, programs }: SlidePICDetailProps) {
 
            <div className="flex-grow w-full">
               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 60, left: 100, bottom: 0 }}>
+                 <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 160, left: 100, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#1e293b" />
-                    <XAxis type="number" hide domain={[0, 110]} />
+                    <XAxis type="number" hide domain={[0, 150]} />
                     <YAxis 
                        dataKey="name" 
                        type="category" 
@@ -147,32 +148,39 @@ export function SlidePICDetail({ pic, programs }: SlidePICDetailProps) {
                        itemStyle={{ color: '#f8fafc', fontWeight: 900 }}
                        labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
                     />
-                    <Bar 
-                      dataKey="percentage" 
-                      radius={[0, 8, 8, 0]} 
-                      barSize={40}
-                      animationDuration={1500}
-                    >
-                       <LabelList 
-                          dataKey="percentage" 
-                          position="right" 
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          content={(props: any) => {
-                             const { x, y, width, value } = props;
-                             if (x === undefined || y === undefined || width === undefined || value === undefined) return null;
-                             return (
-                                <g transform={`translate(${x},${y + 20})`}>
-                                   <rect x={10} y={-14} width={50} height={28} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
-                                   <text 
-                                      x={35} y={0} fill="#ffffff" fontSize={16} fontWeight={900} textAnchor="middle" dominantBaseline="middle"
-                                      style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,1))' }}
-                                   >
-                                      {value}%
-                                   </text>
-                                </g>
-                             );
-                          }}
-                       />
+                       <Bar 
+                         dataKey="percentage" 
+                         radius={[0, 8, 8, 0]} 
+                         barSize={40}
+                         isAnimationActive={false}
+                       >
+                          <LabelList 
+                             dataKey="percentage" 
+                             position="right" 
+                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                             content={(props: any) => {
+                                const { x, y, width, value, index } = props;
+                                if (x === undefined || y === undefined || width === undefined || value === undefined || index === undefined) return null;
+                                
+                                const rpValue = chartData[index]?.achievementRp || 0;
+                                const formattedRp = rpValue >= 1_000_000_000
+                                   ? (rpValue / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'M'
+                                   : rpValue >= 1_000_000
+                                     ? (rpValue / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'jt'
+                                     : rpValue.toLocaleString('id-ID');
+
+                                return (
+                                   <g transform={`translate(${x + width + 10},${y + 20})`}>
+                                      <text 
+                                         x={0} y={0} fill="#f1f5f9" fontSize={14} fontWeight={900} textAnchor="start" dominantBaseline="middle"
+                                         style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }}
+                                      >
+                                         {value}% <tspan fill="#94a3b8" fontSize={11} fontWeight={700}>({formattedRp})</tspan>
+                                      </text>
+                                   </g>
+                                );
+                             }}
+                          />
                        {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                        ))}
