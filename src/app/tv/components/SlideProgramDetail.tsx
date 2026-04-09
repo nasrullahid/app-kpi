@@ -10,8 +10,7 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  ReferenceLine,
-  LabelList
+  ReferenceLine
 } from 'recharts'
 
 interface SlideProgramDetailProps {
@@ -247,29 +246,23 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                            dataKey="pencapaian" 
                            stroke="#6366f1" 
                            strokeWidth={4} 
-                           fillOpacity={1} 
                            fill="url(#colorAch)" 
                            animationDuration={2000}
-                        >
-                           <LabelList 
-                              dataKey="pencapaian" 
-                              position="top" 
-                              offset={15}
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                           content={(props: any) => {
-                                 const { x, y, value } = props;
-                                 if (value === undefined || value === null || value === 0) return null;
-                                 return (
-                                    <text 
-                                       x={x} y={y} dy={-10} fill="#f1f5f9" fontSize={14} fontWeight={900} textAnchor="middle"
-                                       style={{ filter: 'drop-shadow(0px 1px 3px rgba(0,0,0,1))' }}
-                                    >
-                                       {value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString()}
-                                    </text>
-                                 );
-                              }}
-                           />
-                        </Area>
+                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                           label={(props: any) => {
+                             const { x, y, value } = props;
+                             if (!value || value === 0) return null;
+                             const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
+                             return (
+                               <g transform={`translate(${x},${y})`}>
+                                 <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
+                                 <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
+                                   {formatted}
+                                 </text>
+                               </g>
+                             );
+                           }}
+                        />
                         <Area 
                            type="monotone" 
                            dataKey="targetIdeal" 
@@ -344,7 +337,7 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
 
                 <div className="flex-grow w-full">
                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartDataWithTarget} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
+                      <AreaChart data={chartDataWithTarget} margin={{ top: 30, right: 10, left: 10, bottom: 0 }}>
                          <defs>
                             <linearGradient id="colorAchHybrid" x1="0" y1="0" x2="0" y2="1">
                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
@@ -359,32 +352,23 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                             dataKey="pencapaian" 
                             stroke="#6366f1" 
                             strokeWidth={4} 
-                            fillOpacity={1} 
                             fill="url(#colorAchHybrid)"
                             animationDuration={2000}
-                         >
-                            <LabelList 
-                               dataKey="pencapaian" 
-                               position="top" 
-                               offset={15}
-                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                               content={(props: any) => {
-                                  const { x, y, value } = props;
-                                  if (value === undefined || value === null || value === 0) return null;
-                                  const numX = typeof x === 'number' ? x : parseFloat(x || '0');
-                                  const numY = typeof y === 'number' ? y : parseFloat(y || '0');
-                                  const numVal = typeof value === 'number' ? value : parseFloat(value || '0');
-                                  return (
-                                     <text 
-                                        x={numX} y={numY} dy={-10} fill="#f1f5f9" fontSize={14} fontWeight={900} textAnchor="middle"
-                                        style={{ filter: 'drop-shadow(0px 1px 3px rgba(0,0,0,1))' }}
-                                     >
-                                        {numVal >= 1000000 ? (numVal / 1000000).toFixed(1) + 'jt' : numVal.toLocaleString()}
-                                     </text>
-                                  );
-                               }}
-                            />
-                         </Area>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            label={(props: any) => {
+                              const { x, y, value } = props;
+                              if (!value || value === 0) return null;
+                              const formatted = value >= 1000000 ? (value / 1000000).toFixed(1) + 'jt' : value.toLocaleString();
+                              return (
+                                <g transform={`translate(${x},${y})`}>
+                                  <rect x={-28} y={-32} width={56} height={20} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
+                                  <text x={0} y={-18} fill="#f8fafc" fontSize={11} fontWeight={900} textAnchor="middle" style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
+                                    {formatted}
+                                  </text>
+                                </g>
+                              );
+                            }}
+                         />
                          <Area 
                             type="monotone" 
                             dataKey="targetIdeal" 

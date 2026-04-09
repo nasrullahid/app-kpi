@@ -160,12 +160,15 @@ export function SlidePICDetail({ pic, programs }: SlidePICDetailProps) {
                              const { x, y, width, value } = props;
                              if (x === undefined || y === undefined || width === undefined || value === undefined) return null;
                              return (
-                                <text 
-                                   x={x + width + 10} y={y + 20} fill="#f1f5f9" fontSize={16} fontWeight={900} textAnchor="start" dominantBaseline="middle"
-                                   style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,1))' }}
-                                >
-                                   {value}%
-                                </text>
+                                <g transform={`translate(${x},${y + 20})`}>
+                                   <rect x={10} y={-14} width={50} height={28} fill="#1e293b" opacity={0.8} rx={6} stroke="#334155" strokeWidth={1} />
+                                   <text 
+                                      x={35} y={0} fill="#f1f5f9" fontSize={16} fontWeight={900} textAnchor="middle" dominantBaseline="middle"
+                                      style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,1))' }}
+                                   >
+                                      {value}%
+                                   </text>
+                                </g>
                              );
                           }}
                        />
