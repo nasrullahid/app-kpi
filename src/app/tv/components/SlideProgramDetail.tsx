@@ -73,7 +73,7 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
     : "bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.1)]";
 
   return (
-    <div className="h-full flex flex-col p-12 text-slate-100">
+    <div className="h-full flex flex-col p-8 text-slate-100">
       {/* Header with Title and PIC */}
       <div className="flex justify-between items-start mb-10">
         <div className="max-w-[70%]">
@@ -88,7 +88,7 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
                Detail Program {isHybrid ? '(Hybrid)' : isQualitative ? '(Kualitatif)' : '(Kuantitatif)'}
              </span>
           </div>
-          <h1 className="text-7xl font-black text-slate-100 uppercase tracking-tighter leading-none mb-4">
+          <h1 className="text-6xl font-black text-slate-100 uppercase tracking-tighter leading-none mb-4">
              {program.name}
           </h1>
           <div className="flex items-center gap-6">
@@ -107,21 +107,21 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
         {/* Big Percentages / Milestone Status */}
         <div className="flex flex-col items-end gap-2 text-slate-50">
            {!isQualitative ? (
-             <div className="text-right">
-                <div className="text-8xl font-black leading-none">
-                  {program.percentageRp.toFixed(1)}<span className="text-4xl text-slate-400">%</span>
-                </div>
-                <p className="text-sm font-bold text-slate-200 uppercase tracking-[0.3em] mt-2">Capaian Rupiah</p>
-             </div>
+              <div className="text-right">
+                 <div className="text-7xl font-black leading-none">
+                   {program.percentageRp.toFixed(1)}<span className="text-3xl text-slate-400">%</span>
+                 </div>
+                 <p className="text-xs font-bold text-slate-200 uppercase tracking-[0.3em] mt-1">Capaian Rupiah</p>
+              </div>
            ) : (
               <div className="text-right flex flex-col items-end">
-                <div className={cn(
-                  "px-8 py-4 rounded-3xl border-2 text-4xl font-black uppercase tracking-tighter shadow-2xl transition-all duration-700",
-                  milestone.color
-                )}>
-                  {milestone.label}
-                </div>
-                <p className="text-sm font-bold text-slate-200 uppercase tracking-[0.3em] mt-4">Status Milestone</p>
+                 <div className={cn(
+                   "px-6 py-3 rounded-2xl border-2 text-3xl font-black uppercase tracking-tighter shadow-2xl transition-all duration-700",
+                   milestone.color
+                 )}>
+                   {milestone.label}
+                 </div>
+                 <p className="text-xs font-bold text-slate-200 uppercase tracking-[0.3em] mt-2">Status Milestone</p>
               </div>
            )}
         </div>
@@ -490,10 +490,10 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
       {/* Motivational Message Footer */}
       {!isQualitative && (
         <div className={cn(
-          "mt-10 p-10 rounded-[2.5rem] border-2 text-center transition-all duration-1000 flex items-center justify-center min-h-[140px]",
+          "mt-6 p-6 rounded-[2rem] border-2 text-center transition-all duration-1000 flex items-center justify-center relative z-10",
           motivationalTheme
         )}>
-          <p className="text-5xl font-black uppercase tracking-tighter leading-tight drop-shadow-sm">
+          <p className="text-3xl font-black uppercase tracking-tight leading-tight drop-shadow-sm">
             {motivationalMessage}
           </p>
         </div>
