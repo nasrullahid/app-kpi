@@ -42,6 +42,8 @@ type AggregatedProgram = Program & {
   effective_target_user: number
   latest_qualitative_status: 'not_started' | 'in_progress' | 'completed' | null
   percentage_rp: number
+  per_day_target_rp: number
+  per_day_target_user: number
   business_status: 'PERLU PERHATIAN' | 'MENUJU TARGET' | 'TERCAPAI' | 'TERLAMPAUI'
 }
 
@@ -192,6 +194,10 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
         percentage_rp = (cumulative_rp / effective_target_rp) * 100
       }
 
+      // Daily Target (calculated or overridden)
+      const per_day_target_rp = prog.daily_target_rp || ((prog.monthly_target_rp || 0) / (activePeriod.working_days || 30))
+      const per_day_target_user = prog.daily_target_user || ((prog.monthly_target_user || 0) / (activePeriod.working_days || 30))
+
       let business_status: AggregatedProgram['business_status'] = 'PERLU PERHATIAN'
       if (prog.target_type === 'qualitative') {
         if (latest_qualitative_status === 'completed') business_status = 'TERCAPAI'
@@ -212,6 +218,8 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
         effective_target_user,
         latest_qualitative_status,
         percentage_rp,
+        per_day_target_rp,
+        per_day_target_user,
         business_status
       }
     })
@@ -289,7 +297,9 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
   // Helper formatting for Y Axis
   const formatYAxis = (tickItem: number) => {
     if (tickItem === 0) return '0'
-    if (tickItem >= 1000000) return (tickItem / 1000000).toFixed(0) + ' Jt'
+    if (tickItem >= 1000000000) return (tickItem / 1000000000).toFixed(1).replace(/\.0$/, '') + ' M'
+    if (tickItem >= 1000000) return (tickItem / 1000000).toFixed(0) + ' jt'
+    if (tickItem >= 1000) return (tickItem / 1000).toFixed(0) + ' rb'
     return tickItem.toString()
   }
 
@@ -568,8 +578,14 @@ export function DashboardClient({ programs, dailyInputs, activePeriod, initialFi
                             <span className="font-extrabold text-slate-800">{formatRupiah(program.cumulative_rp)}</span>
                           </div>
                           <div className="flex flex-col text-right">
-                             <span className="text-[10px] uppercase font-bold text-slate-400">Target Bulanan</span>
-                             <span className="font-bold text-slate-600">{formatRupiah(program.monthly_target_rp || 0)}</span>
+                             <div className="flex flex-col mb-1">
+                                <span className="text-[10px] uppercase font-bold text-slate-400">Target Bulanan</span>
+                                <span className="font-bold text-slate-600 text-sm">{formatRupiah(program.monthly_target_rp || 0)}</span>
+                             </div>
+                             <div className="flex flex-col border-t border-slate-50 pt-1">
+                                <span className="text-[10px] uppercase font-bold text-indigo-400/70">Target Harian</span>
+                                <span className="font-black text-indigo-600 text-xs">{formatRupiah(program.per_day_target_rp)}</span>
+                             </div>
                           </div>
                         </div>
 
