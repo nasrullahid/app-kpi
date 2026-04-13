@@ -7,16 +7,12 @@ import { formatRupiah, cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { 
   Lock, 
-  AlertCircle, 
   CheckCircle2, 
   Circle, 
-  ExternalLink,
   Edit3,
   CheckCircle,
   ClipboardList,
   Target,
-  ChevronDown,
-  ChevronUp,
   Trash2
 } from 'lucide-react'
 
@@ -48,8 +44,6 @@ export function InputFormClient({
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeMId, setActiveMId] = useState<string | null>(null) // For expanding milestone details
-  const [error, setError] = useState<string | null>(null)
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -110,7 +104,6 @@ export function InputFormClient({
     }
     
     setIsLoading(true)
-    setError(null)
     
     const formData = new FormData(e.currentTarget)
     
@@ -139,7 +132,6 @@ export function InputFormClient({
       }
       
       if ('error' in res && res.error) {
-        setError(res.error)
         toast.error(res.error)
       } else {
         toast.success(editingId ? 'Data berhasil diperbarui!' : 'Pencapaian harian berhasil dicatat!')
@@ -428,7 +420,7 @@ export function InputFormClient({
 
                 <div className="mt-6 pt-4 border-t border-slate-200 space-y-2">
                   <p className="text-[10px] text-slate-400 font-bold leading-relaxed px-1">
-                    * Misi kualitatif yang Anda centang bersifat persisten dan akan terus berstatus "Selesai" di bulan-bulan berikutnya sampai program berakhir.
+                    * Misi kualitatif yang Anda centang bersifat persisten dan akan terus berstatus &quot;Selesai&quot; di bulan-bulan berikutnya sampai program berakhir.
                   </p>
                 </div>
               </div>

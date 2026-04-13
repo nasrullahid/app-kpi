@@ -4,6 +4,11 @@ import { InputFormClient } from './input-form-client'
 
 export const dynamic = 'force-dynamic'
 
+type Milestone = Database['public']['Tables']['program_milestones']['Row']
+type ProgramWithMilestones = Database['public']['Tables']['programs']['Row'] & {
+  program_milestones: Milestone[]
+}
+
 type DailyInputWithDetails = Database['public']['Tables']['daily_inputs']['Row'] & {
   programs: {
     name: string;
@@ -35,7 +40,7 @@ export default async function InputHarianPage() {
     .order('name')
 
   // Fetch ALL Milestone Completions for active programs to ensure persistence
-  const allMilestoneIds = activePrograms?.flatMap(p => (p as any).program_milestones?.map((m: any) => m.id)) || []
+  const allMilestoneIds = (activePrograms as unknown as ProgramWithMilestones[])?.flatMap(p => p.program_milestones?.map((m: Milestone) => m.id)) || []
   const { data: milestoneCompletions } = await supabase
     .from('milestone_completions')
     .select('*')

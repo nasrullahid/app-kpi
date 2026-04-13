@@ -6,7 +6,6 @@ import { createProgram,
   toggleProgramStatus, 
   deleteProgram,
   addMilestone,
-  updateMilestone,
   deleteMilestone
 } from './actions'
 import { Database } from '@/types/database'
@@ -58,19 +57,14 @@ export function ProgramClient({
   // Auto-calc states
   const [monthlyRp, setMonthlyRp] = useState<string>('')
   const [monthlyUser, setMonthlyUser] = useState<string>('')
-  const [isManualDaily, setIsManualDaily] = useState(false)
 
-  // Auto-calculated Daily Targets
   const workDays = activePeriod?.working_days || 20
-  const calcDailyRp = monthlyRp ? Math.floor(Number(monthlyRp) / workDays) : 0
-  const calcDailyUser = monthlyUser ? Math.ceil(Number(monthlyUser) / workDays) : 0
 
   const handleOpenCreate = () => {
     setEditingProgramId(null)
     setSelectedTargetType('quantitative')
     setMonthlyRp('')
     setMonthlyUser('')
-    setIsManualDaily(false)
     setSelectedPicIds([])
     setIsModalOpen(true)
   }
@@ -83,13 +77,6 @@ export function ProgramClient({
     
     // Set team members
     setSelectedPicIds(program.program_pics.map(p => p.profile_id))
-
-    if (program.daily_target_rp && program.monthly_target_rp) {
-      const autoCalc = Math.floor(program.monthly_target_rp / workDays)
-      setIsManualDaily(program.daily_target_rp !== autoCalc)
-    } else {
-      setIsManualDaily(false)
-    }
 
     setIsModalOpen(true)
   }
@@ -127,7 +114,6 @@ export function ProgramClient({
   async function handleSubmitProgram(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setIsLoading(true)
-    setError(null)
     
     if (selectedPicIds.length === 0) {
       setError('Pilih minimal satu PIC untuk tim program ini.')

@@ -4,7 +4,12 @@ import { Database } from '@/types/database'
 import { Suspense } from 'react'
 
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
-type Program = Database['public']['Tables']['programs']['Row']
+type Milestone = Database['public']['Tables']['program_milestones']['Row']
+
+type ProgramWithRelations = Database['public']['Tables']['programs']['Row'] & {
+  program_pics: { profile_id: string }[]
+  program_milestones: Milestone[]
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +47,10 @@ export default async function DashboardPage({
     const myProgramIds = myTeamPrograms?.map(tp => tp.program_id) || []
     programsQuery = programsQuery.in('id', myProgramIds)
   }
-  const { data: programs } = await programsQuery
+  const { data: programs } = await (programsQuery as any) as { data: ProgramWithRelations[] | null }
 
   // 4. Milestone Completions (Fetch all for these programs to ensure persistence)
-  const allMilestoneIds = programs?.flatMap(p => (p as any).program_milestones?.map((m: any) => m.id)) || []
+  const allMilestoneIds = programs?.flatMap(p => p.program_milestones?.map((m: Milestone) => m.id)) || []
   const { data: milestoneCompletions } = await supabase
     .from('milestone_completions')
     .select('*')
@@ -58,8 +63,8 @@ export default async function DashboardPage({
 
   // 6. Daily Inputs
   let dailyInputs: DailyInput[] = []
-  if (activePeriod && programs && (programs as any[]).length > 0) {
-    const programIds = (programs as any[]).map((p: any) => p.id)
+  if (activePeriod && programs && programs.length > 0) {
+    const programIds = programs.map(p => p.id)
     
     let query = supabase
       .from('daily_inputs')
@@ -109,7 +114,7 @@ export default async function DashboardPage({
       ) : programs && programs.length > 0 ? (
         <Suspense fallback={<div className="h-96 w-full animate-pulse bg-slate-100 rounded-xl" />}>
           <DashboardClient 
-            programs={programs as any} 
+            programs={programs || []} 
             dailyInputs={dailyInputs} 
             activePeriod={activePeriod}
             initialFilters={filterStrings}

@@ -34,7 +34,6 @@ import {
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { 
   Calendar as CalendarIcon, 
-  Filter, 
   XCircle, 
   ChartNoAxesColumn, 
   ChartNoAxesCombined, 

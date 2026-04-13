@@ -94,10 +94,10 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     .select('*, program_pics(profile_id), program_milestones(*)')
     .eq('is_active', true)
 
-  const rawPrograms = (allPrograms as any[]) || []
+  const rawPrograms = (allPrograms as Program[]) || []
 
   // 3. Fetch All Milestone Completions (Full persistence)
-  const allMilestoneIds = rawPrograms.flatMap(p => p.program_milestones.map((m: any) => m.id))
+  const allMilestoneIds = rawPrograms.flatMap(p => p.program_milestones.map((m: Milestone) => m.id))
   const { data: milestoneCompletions } = await supabase
     .from('milestone_completions')
     .select('*')
@@ -129,7 +129,7 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     
     // Qualitative Progress
     const totalMilestones = prog.program_milestones.length
-    const completedMilestones = prog.program_milestones.filter((ms: any) => 
+    const completedMilestones = prog.program_milestones.filter((ms: Milestone) => 
       completions.find(c => c.milestone_id === ms.id && c.is_completed)
     ).length
     const qualitativePercentage = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
@@ -143,7 +143,7 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       else if (percentageRp >= 50) status = 'MENUJU TARGET'
     }
 
-    const team = (prog.program_pics as any[]).map(pp => ({
+    const team = prog.program_pics.map(pp => ({
       id: pp.profile_id,
       name: profileMap.get(pp.profile_id) || '??'
     }))
