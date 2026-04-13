@@ -358,7 +358,7 @@ export function DashboardClient({
                      labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
                      itemStyle={{ fontWeight: 'bold', fontSize: '14px' }}
                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                     formatter={(value: any) => [`${value}%`]}
+                     formatter={(value: any, name: any) => [`${value}%`, name]}
                    />
                    <ReferenceLine y={100} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'top', value: 'Target 100%', fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} />
                    
