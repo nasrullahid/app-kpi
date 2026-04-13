@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createProgram, 
   updateProgram, 
-  toggleProgramStatus, 
   deleteProgram,
   addMilestone,
   deleteMilestone
@@ -33,12 +32,10 @@ type Period = Database['public']['Tables']['periods']['Row']
 export function ProgramClient({ 
   programs, 
   isAdmin, 
-  activePeriod,
   picProfiles
 }: { 
   programs: Program[], 
   isAdmin: boolean, 
-  activePeriod: Period | null,
   picProfiles?: { id: string, name: string, whatsapp_number: string | null }[]
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)

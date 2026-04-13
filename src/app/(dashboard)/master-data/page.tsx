@@ -83,7 +83,6 @@ export default async function MasterDataPage({
             <ProgramClient 
               programs={programs || []} 
               isAdmin={isAdmin} 
-              activePeriod={periods?.find(p => p.is_active)}
               picProfiles={picProfiles || []}
             />
           )}
