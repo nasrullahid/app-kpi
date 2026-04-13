@@ -27,7 +27,6 @@ type Program = Database['public']['Tables']['programs']['Row'] & {
   program_milestones: ProgramMilestone[]
 }
 type TargetType = Database['public']['Enums']['target_type']
-type Period = Database['public']['Tables']['periods']['Row']
 
 export function ProgramClient({ 
   programs, 
