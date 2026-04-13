@@ -15,7 +15,10 @@ import {
   ClipboardList,
   Target,
   Trash2,
-  Calculator
+  Calculator,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react'
 
 type ProgramMilestone = Database['public']['Tables']['program_milestones']['Row']
@@ -40,7 +43,8 @@ export function InputFormClient({
   isAdmin,
   activePeriod,
   milestoneCompletions,
-  existingMetricValues = []
+  existingMetricValues = [],
+  allPeriodMetricValues = []
 }: { 
   programs: Program[], 
   pastInputs: DailyInput[], 
@@ -48,10 +52,16 @@ export function InputFormClient({
   activePeriod?: Period,
   milestoneCompletions: MilestoneCompletion[]
   existingMetricValues?: MetricValue[]
+  allPeriodMetricValues?: MetricValue[]
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   
+  // Table state
+  type SortColumn = 'date' | 'pic' | 'program';
+  const [sortConfig, setSortConfig] = useState<{ key: SortColumn, direction: 'asc'|'desc' } | null>(null)
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
+
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedProgramId, setSelectedProgramId] = useState<string>(programs[0]?.id || '')
@@ -89,6 +99,35 @@ export function InputFormClient({
   })
 
   // Handlers
+  const handleSort = (key: SortColumn) => {
+    setSortConfig(prev => {
+      if (prev?.key === key && prev.direction === 'asc') return { key, direction: 'desc' };
+      if (prev?.key === key && prev.direction === 'desc') return null;
+      return { key, direction: 'asc' };
+    });
+  }
+
+  const sortedInputs = [...pastInputs].sort((a, b) => {
+    if (!sortConfig) return 0;
+    let aVal: string | number = '';
+    let bVal: string | number = '';
+
+    if (sortConfig.key === 'date') {
+      aVal = new Date(a.date).getTime();
+      bVal = new Date(b.date).getTime();
+    } else if (sortConfig.key === 'pic') {
+      aVal = a.profiles?.name || '';
+      bVal = b.profiles?.name || '';
+    } else if (sortConfig.key === 'program') {
+      aVal = a.programs?.name || '';
+      bVal = b.programs?.name || '';
+    }
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const handleOpenCreate = () => {
     if (isLocked) {
       toast.error('Gagal: Periode ini telah dikunci oleh Admin.')
@@ -250,22 +289,45 @@ export function InputFormClient({
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4">Tanggal</th>
-              {isAdmin && <th className="px-6 py-4">Pengisi (PIC)</th>}
-              <th className="px-6 py-4">Program</th>
-              <th className="px-6 py-4 text-center">Progress (Quant)</th>
+              <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none group" onClick={() => handleSort('date')}>
+                <div className="flex items-center gap-1.5">
+                  Tanggal
+                  {sortConfig?.key === 'date' ? (
+                    sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                  ) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                </div>
+              </th>
+              {isAdmin && (
+                <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none group" onClick={() => handleSort('pic')}>
+                  <div className="flex items-center gap-1.5">
+                    Pengisi (PIC)
+                    {sortConfig?.key === 'pic' ? (
+                      sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                    ) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                  </div>
+                </th>
+              )}
+              <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none group" onClick={() => handleSort('program')}>
+                <div className="flex items-center gap-1.5">
+                  Program
+                  {sortConfig?.key === 'program' ? (
+                    sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3 text-indigo-600" /> : <ChevronDown className="h-3 w-3 text-indigo-600" />
+                  ) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                </div>
+              </th>
+              <th className="px-6 py-4 text-center">Capaian Harian</th>
               {!isLocked && <th className="px-6 py-4 text-right">Aksi</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {pastInputs.length === 0 ? (
+            {sortedInputs.length === 0 ? (
               <tr>
                 <td colSpan={isAdmin ? (isLocked ? 4 : 5) : (isLocked ? 3 : 4)} className="px-6 py-12 text-center text-slate-400 font-medium italic">
                   Belum ada catatan aktivitas hari ini.
                 </td>
               </tr>
             ) : (
-              pastInputs.map((input) => {
+              sortedInputs.map((input) => {
                 const prog = programs.find(p => p.id === input.program_id)
                 const percentageHarian = (prog?.daily_target_rp && input.achievement_rp) 
                   ? ((input.achievement_rp / prog.daily_target_rp) * 100).toFixed(1) 
@@ -289,23 +351,73 @@ export function InputFormClient({
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    {(input.programs?.target_type === 'quantitative' || input.programs?.target_type === 'hybrid') ? (
-                      <div className="inline-flex flex-col items-center p-2 rounded-lg bg-indigo-50/30 border border-indigo-50">
-                        <span className="font-extrabold text-indigo-700 text-xs">{formatRupiah(Number(input.achievement_rp || 0))}</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] text-slate-500 font-bold">{input.achievement_user || 0} user</span>
-                          {percentageHarian && (
-                            <span className={cn(
-                              "text-[9px] px-1.5 rounded-full font-black uppercase",
-                              Number(percentageHarian) >= 100 ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700"
-                            )}>
-                              {percentageHarian}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : ( <span className="text-slate-300">-</span> )}
+                  <td className="px-6 py-4 text-center align-top">
+                    {(() => {
+                      const programMetrics = prog?.program_metric_definitions || [];
+                      const isCustomMetricProgram = programMetrics.length > 0;
+
+                      if (isCustomMetricProgram) {
+                        // Adaptive display for custom metrics
+                        const dateMetrics = allPeriodMetricValues?.filter(mv => 
+                          mv.program_id === input.program_id && mv.date === input.date
+                        ) || [];
+                        
+                        // Pick metrics to show: ideally targets first, then manuals
+                        const allApplicableMetrics = programMetrics.filter(m => m.is_target_metric || m.input_type === 'manual');
+                        const isExpanded = expandedRows[input.id];
+                        const metricsToShow = isExpanded ? allApplicableMetrics : allApplicableMetrics.slice(0, 3);
+
+                        if (metricsToShow.length === 0) return <span className="text-slate-300">-</span>
+
+                        return (
+                          <div className="flex flex-col gap-1.5 items-center">
+                            <div className="flex flex-wrap justify-center gap-1.5 max-w-[220px]">
+                              {metricsToShow.map(mDef => {
+                                const v = dateMetrics.find(dm => dm.metric_definition_id === mDef.id)?.value;
+                                if (v === undefined || v === null) return null;
+                                
+                                return (
+                                  <div key={mDef.id} className="inline-flex flex-col items-center p-1.5 rounded-lg bg-indigo-50/50 border border-indigo-100/50 min-w-[100px] max-w-[105px]">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-tight mb-1 line-clamp-1 w-full text-center" title={mDef.label}>{mDef.label}</span>
+                                    <span className="font-bold text-indigo-700 text-xs">{formatMetricValue(v, mDef.data_type, mDef.unit_label)}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {allApplicableMetrics.length > 3 && (
+                               <button 
+                                 onClick={() => setExpandedRows(prev => ({ ...prev, [input.id]: !prev[input.id] }))}
+                                 className="text-[9px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors mt-0.5"
+                               >
+                                 {isExpanded ? 'Tutup Detail' : `+${allApplicableMetrics.length - 3} Lainnya (Lihat)`}
+                               </button>
+                            )}
+                          </div>
+                        )
+                      }
+                      
+                      // Legacy display
+                      if (input.programs?.target_type === 'quantitative' || input.programs?.target_type === 'hybrid') {
+                        return (
+                          <div className="inline-flex flex-col items-center p-2 rounded-lg bg-indigo-50/30 border border-indigo-50">
+                            <span className="font-extrabold text-indigo-700 text-xs">{formatRupiah(Number(input.achievement_rp || 0))}</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-slate-500 font-bold">{input.achievement_user || 0} user</span>
+                              {percentageHarian && (
+                                <span className={cn(
+                                  "text-[9px] px-1.5 rounded-full font-black uppercase",
+                                  Number(percentageHarian) >= 100 ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700"
+                                )}>
+                                  {percentageHarian}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      }
+                      
+                      return <span className="text-slate-300">-</span>
+                    })()}
                   </td>
                   {!isLocked && (
                     <td className="px-6 py-4 text-right">

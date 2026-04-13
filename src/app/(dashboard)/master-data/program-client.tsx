@@ -308,7 +308,7 @@ export function ProgramClient({
                   <td className="px-6 py-4 text-center">
                     {prog.is_active ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        AKTIFF
+                        AKTIF
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">

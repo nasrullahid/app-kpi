@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: model_decision
 ---
 
 You are an expert full-stack developer helping me build a business performance dashboard web application from scratch. I am the sole developer with intermediate coding experience.

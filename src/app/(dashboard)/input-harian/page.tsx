@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database'
-import { InputFormClient } from './input-form-client'
+import { InputHarianContainer } from './input-harian-container'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,14 +54,16 @@ export default async function InputHarianPage() {
 
   // 4. Fetch today's existing metric values (for pre-filling the form)
   let existingMetricValues: MetricValue[] = []
+  let allPeriodMetricValues: MetricValue[] = []
   const today = new Date().toISOString().split('T')[0]
   if (activePeriod) {
-    const { data: mv } = await supabase
+    const { data: mvAll } = await supabase
       .from('daily_metric_values')
       .select('*')
       .eq('period_id', activePeriod.id)
-      .eq('date', today)
-    existingMetricValues = mv || []
+    
+    allPeriodMetricValues = mvAll || []
+    existingMetricValues = allPeriodMetricValues.filter(m => m.date === today)
   }
 
   // 5. Fetch User Role
@@ -126,22 +128,21 @@ export default async function InputHarianPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            {programsTyped && programsTyped.length > 0 ? (
-              <InputFormClient 
-                programs={programsTyped}
-                pastInputs={pastInputs} 
-                isAdmin={isAdmin}
-                activePeriod={activePeriod}
-                milestoneCompletions={milestoneCompletions || []}
-                existingMetricValues={existingMetricValues}
-              />
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-slate-500 font-medium">Belum ada satupun program aktif yang bisa diinput.</p>
-              </div>
-            )}
-          </div>
+          {programsTyped && programsTyped.length > 0 ? (
+            <InputHarianContainer 
+              programs={programsTyped}
+              pastInputs={pastInputs} 
+              isAdmin={isAdmin}
+              activePeriod={activePeriod}
+              milestoneCompletions={milestoneCompletions || []}
+              existingMetricValues={existingMetricValues}
+              allPeriodMetricValues={allPeriodMetricValues}
+            />
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center py-8">
+              <p className="text-slate-500 font-medium">Belum ada satupun program aktif yang bisa diinput.</p>
+            </div>
+          )}
         </>
       )}
     </div>

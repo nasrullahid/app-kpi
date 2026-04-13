@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: model_decision
 ---
 
 ## Full Project Context — Dashboard Update (Phase 2)

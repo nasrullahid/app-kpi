@@ -213,3 +213,49 @@ export async function submitDailyMetricValues(
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+export async function upsertSingleMetricValue(params: {
+  programId: string;
+  metricDefinitionId: string;
+  date: string;
+  value: number | null;
+}): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: period } = await supabase
+    .from('periods')
+    .select('id, is_locked')
+    .eq('is_active', true)
+    .single()
+
+  if (!period) return { error: 'Tidak ada periode aktif saat ini.' }
+  if (period.is_locked) return { error: 'Periode ini sudah dikunci oleh Admin.' }
+
+  const row = {
+    period_id: period.id,
+    program_id: params.programId,
+    metric_definition_id: params.metricDefinitionId,
+    date: params.date,
+    value: params.value,
+    created_by: user.id,
+  }
+
+  const { error } = await supabase
+    .from('daily_metric_values')
+    .upsert(row, {
+      onConflict: 'period_id,program_id,metric_definition_id,date'
+    })
+
+  if (error) {
+    console.error('Upsert Single Metric Error:', error)
+    return { error: error.message }
+  }
+
+  // We don't want to revalidate path here immediately if it's frequent inline edit, 
+  // but to keep consistency for other clients, it's safer to revalidate.
+  revalidatePath('/input-harian')
+  return { success: true }
+}
