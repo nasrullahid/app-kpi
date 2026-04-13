@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createProgram, 
   updateProgram, 
   deleteProgram,
@@ -10,6 +11,7 @@ import { createProgram,
 import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { DEPARTMENTS, getDepartmentConfig } from '@/lib/department-config'
 import { 
   Users, 
   Target, 
@@ -18,7 +20,8 @@ import {
   Trash2, 
   Settings2,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  BarChart2
 } from 'lucide-react'
 
 type ProgramMilestone = Database['public']['Tables']['program_milestones']['Row']
@@ -37,11 +40,13 @@ export function ProgramClient({
   isAdmin: boolean, 
   picProfiles?: { id: string, name: string, whatsapp_number: string | null }[]
 }) {
+  const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProgramId, setEditingProgramId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedTargetType, setSelectedTargetType] = useState<TargetType>('quantitative')
+  const [selectedDepartment, setSelectedDepartment] = useState('general')
   
   // Teams Support
   const [selectedPicIds, setSelectedPicIds] = useState<string[]>([])
@@ -58,6 +63,7 @@ export function ProgramClient({
   const handleOpenCreate = () => {
     setEditingProgramId(null)
     setSelectedTargetType('quantitative')
+    setSelectedDepartment('general')
     setMonthlyRp('')
     setMonthlyUser('')
     setSelectedPicIds([])
@@ -67,12 +73,10 @@ export function ProgramClient({
   const handleOpenEdit = (program: Program) => {
     setEditingProgramId(program.id)
     setSelectedTargetType(program.target_type || 'quantitative')
+    setSelectedDepartment(program.department || 'general')
     setMonthlyRp(program.monthly_target_rp ? program.monthly_target_rp.toString() : '')
     setMonthlyUser(program.monthly_target_user ? program.monthly_target_user.toString() : '')
-    
-    // Set team members
     setSelectedPicIds(program.program_pics.map(p => p.profile_id))
-
     setIsModalOpen(true)
   }
 
@@ -121,6 +125,7 @@ export function ProgramClient({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
       name: formData.get('name') as string,
+      department: selectedDepartment,
       pic_ids: selectedPicIds,
       target_type: selectedTargetType,
       monthly_target_rp: (selectedTargetType === 'quantitative' || selectedTargetType === 'hybrid') ? Number(formData.get('monthly_target_rp')) : null,
@@ -260,7 +265,14 @@ export function ProgramClient({
                 <tr key={prog.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{prog.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 uppercase tracking-tighter">ID: {prog.id.split('-')[0]}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {(() => { const d = getDepartmentConfig(prog.department || 'general'); return (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${d.color} ${d.textColor}`}>
+                          {d.label}
+                        </span>
+                      )})()}
+                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-tighter">#{prog.id.split('-')[0]}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex -space-x-2 overflow-hidden hover:space-x-1 transition-all">
@@ -306,7 +318,14 @@ export function ProgramClient({
                   </td>
                   {isAdmin && (
                     <td className="px-6 py-4">
-                      <div className="flex justify-end gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => router.push(`/master-data/programs/${prog.id}/metrics`)}
+                          className="p-2 text-slate-600 hover:bg-white hover:text-emerald-600 rounded-lg border border-transparent hover:border-slate-200 shadow-none hover:shadow-sm transition-all"
+                          title="Definisi KPI"
+                        >
+                          <BarChart2 className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleOpenMilestones(prog)}
                           className="p-2 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg border border-transparent hover:border-slate-200 shadow-none hover:shadow-sm transition-all"
@@ -372,6 +391,19 @@ export function ProgramClient({
                       placeholder="Contoh: Certification Voyager 2026"
                       className="w-full text-sm font-medium rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Departemen</label>
+                    <select
+                      value={selectedDepartment}
+                      onChange={e => setSelectedDepartment(e.target.value)}
+                      className="w-full text-sm font-medium rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all bg-white"
+                    >
+                      {DEPARTMENTS.map(d => (
+                        <option key={d.key} value={d.key}>{d.label}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-3">

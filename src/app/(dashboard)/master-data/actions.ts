@@ -12,6 +12,7 @@ export type ActionResponse = { error: string } | { success: boolean; data?: unkn
 
 export async function createProgram(data: {
   name: string
+  department: string
   pic_ids: string[]
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null
@@ -83,6 +84,7 @@ export async function toggleProgramStatus(id: string, currentStatus: boolean): P
 
 export async function updateProgram(id: string, data: {
   name: string
+  department: string
   pic_ids: string[]
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null

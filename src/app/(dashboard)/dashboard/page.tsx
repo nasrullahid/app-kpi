@@ -5,10 +5,13 @@ import { Suspense } from 'react'
 
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
 type Milestone = Database['public']['Tables']['program_milestones']['Row']
+type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 
 type ProgramWithRelations = Database['public']['Tables']['programs']['Row'] & {
   program_pics: { profile_id: string }[]
   program_milestones: Milestone[]
+  program_metric_definitions: MetricDefinition[]
 }
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +37,7 @@ export default async function DashboardPage({
   // 3. Programs and Team Access
   let programsQuery = supabase
     .from('programs')
-    .select('*, program_pics(profile_id), program_milestones(*)')
+    .select('*, program_pics(profile_id), program_milestones(*), program_metric_definitions(*)')
     .eq('is_active', true)
 
   if (!isAdmin && user) {
@@ -82,6 +85,18 @@ export default async function DashboardPage({
     dailyInputs = inputs || []
   }
 
+  // 7. Metric Values (aggregated for the active period)
+  let metricValues: MetricValue[] = []
+  if (activePeriod && programs && programs.length > 0) {
+    const programIds = programs.map(p => p.id)
+    const { data: mv } = await supabase
+      .from('daily_metric_values')
+      .select('*')
+      .in('program_id', programIds)
+      .eq('period_id', activePeriod.id)
+    metricValues = mv || []
+  }
+
   const filterStrings = {
     startDate: startDate || '',
     endDate: endDate || ''
@@ -121,6 +136,7 @@ export default async function DashboardPage({
             initialFilters={filterStrings}
             milestoneCompletions={milestoneCompletions || []}
             picProfiles={picProfiles || []}
+            metricValues={metricValues}
           />
         </Suspense>
       ) : (

@@ -5,8 +5,12 @@ import { InputFormClient } from './input-form-client'
 export const dynamic = 'force-dynamic'
 
 type Milestone = Database['public']['Tables']['program_milestones']['Row']
+type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
+
 type ProgramWithMilestones = Database['public']['Tables']['programs']['Row'] & {
   program_milestones: Milestone[]
+  program_metric_definitions: MetricDefinition[]
 }
 
 type DailyInputWithDetails = Database['public']['Tables']['daily_inputs']['Row'] & {
@@ -32,25 +36,39 @@ export default async function InputHarianPage() {
     .eq('is_active', true)
     .single()
 
-  // 2. Fetch Active Programs with Milestones
+  // 2. Fetch Active Programs with Milestones AND Metric Definitions
   const { data: activePrograms } = await supabase
     .from('programs')
-    .select('*, program_milestones(*)')
+    .select('*, program_milestones(*), program_metric_definitions(*)')
     .eq('is_active', true)
     .order('name')
 
-  // Fetch ALL Milestone Completions for active programs to ensure persistence
-  const allMilestoneIds = (activePrograms as unknown as ProgramWithMilestones[])?.flatMap(p => p.program_milestones?.map((m: Milestone) => m.id)) || []
+  const programsTyped = (activePrograms as unknown as ProgramWithMilestones[]) || []
+
+  // 3. Fetch ALL Milestone Completions for active programs
+  const allMilestoneIds = programsTyped.flatMap(p => p.program_milestones?.map((m: Milestone) => m.id)) || []
   const { data: milestoneCompletions } = await supabase
     .from('milestone_completions')
     .select('*')
-    .in('milestone_id', allMilestoneIds)
+    .in('milestone_id', allMilestoneIds.length > 0 ? allMilestoneIds : ['none'])
 
-  // Fetch User Role
+  // 4. Fetch today's existing metric values (for pre-filling the form)
+  let existingMetricValues: MetricValue[] = []
+  const today = new Date().toISOString().split('T')[0]
+  if (activePeriod) {
+    const { data: mv } = await supabase
+      .from('daily_metric_values')
+      .select('*')
+      .eq('period_id', activePeriod.id)
+      .eq('date', today)
+    existingMetricValues = mv || []
+  }
+
+  // 5. Fetch User Role
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin'
 
-  // 3. Fetch Past Inputs for the Active Period
+  // 6. Fetch Past Inputs for the Active Period
   let pastInputs: DailyInputWithDetails[] = []
   if (activePeriod) {
     let query = supabase
@@ -69,7 +87,6 @@ export default async function InputHarianPage() {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       
-    // If not admin, only fetch their own inputs
     if (!isAdmin) {
       query = query.eq('created_by', user.id)
     }
@@ -110,13 +127,14 @@ export default async function InputHarianPage() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            {activePrograms && activePrograms.length > 0 ? (
+            {programsTyped && programsTyped.length > 0 ? (
               <InputFormClient 
-                programs={activePrograms || []} 
+                programs={programsTyped}
                 pastInputs={pastInputs} 
                 isAdmin={isAdmin}
                 activePeriod={activePeriod}
                 milestoneCompletions={milestoneCompletions || []}
+                existingMetricValues={existingMetricValues}
               />
             ) : (
               <div className="text-center py-8">

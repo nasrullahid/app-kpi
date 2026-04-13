@@ -165,3 +165,51 @@ export async function submitMilestoneCompletion(data: {
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+/**
+ * CUSTOM METRIC VALUES (Phase 2)
+ */
+
+export async function submitDailyMetricValues(
+  programId: string,
+  date: string,
+  values: { metric_definition_id: string; value: number | null }[]
+): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: period } = await supabase
+    .from('periods')
+    .select('id, is_locked')
+    .eq('is_active', true)
+    .single()
+
+  if (!period) return { error: 'Tidak ada periode aktif saat ini.' }
+  if (period.is_locked) return { error: 'Periode ini sudah dikunci oleh Admin.' }
+
+  const rows = values.map(v => ({
+    period_id: period.id,
+    program_id: programId,
+    metric_definition_id: v.metric_definition_id,
+    date,
+    value: v.value,
+    created_by: user.id,
+  }))
+
+  const { error } = await supabase
+    .from('daily_metric_values')
+    .upsert(rows, {
+      onConflict: 'period_id,program_id,metric_definition_id,date'
+    })
+
+  if (error) {
+    console.error('Submit Metric Values Error:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/input-harian')
+  revalidatePath('/dashboard')
+  return { success: true }
+}

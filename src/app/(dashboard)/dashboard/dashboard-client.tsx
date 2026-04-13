@@ -50,10 +50,13 @@ import { format as formatDate } from 'date-fns'
 
 type Milestone = Database['public']['Tables']['program_milestones']['Row']
 type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
+type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 
 type Program = Database['public']['Tables']['programs']['Row'] & {
   program_pics: { profile_id: string }[]
   program_milestones: Milestone[]
+  program_metric_definitions: MetricDefinition[]
 }
 
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
@@ -69,6 +72,7 @@ interface DashboardClientProps {
   }
   milestoneCompletions: MilestoneCompletion[]
   picProfiles: { id: string; name: string }[]
+  metricValues?: MetricValue[]
 }
 
 type AggregatedProgram = Program & {

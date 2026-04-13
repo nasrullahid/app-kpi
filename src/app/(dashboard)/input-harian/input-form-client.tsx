@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { submitDailyInput, updateDailyInput, deleteDailyInput, submitMilestoneCompletion } from './actions'
+import { useState, useEffect } from 'react'
+import { submitDailyInput, updateDailyInput, deleteDailyInput, submitMilestoneCompletion, submitDailyMetricValues } from './actions'
 import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
+import { evaluateFormula, formatMetricValue } from '@/lib/formula-evaluator'
 import { toast } from 'sonner'
 import { 
   Lock, 
@@ -13,14 +14,18 @@ import {
   CheckCircle,
   ClipboardList,
   Target,
-  Trash2
+  Trash2,
+  Calculator
 } from 'lucide-react'
 
 type ProgramMilestone = Database['public']['Tables']['program_milestones']['Row']
 type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
+type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 
 type Program = Database['public']['Tables']['programs']['Row'] & {
   program_milestones: ProgramMilestone[]
+  program_metric_definitions: MetricDefinition[]
 }
 
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row'] & {
@@ -34,13 +39,15 @@ export function InputFormClient({
   pastInputs, 
   isAdmin,
   activePeriod,
-  milestoneCompletions
+  milestoneCompletions,
+  existingMetricValues = []
 }: { 
   programs: Program[], 
   pastInputs: DailyInput[], 
   isAdmin?: boolean,
   activePeriod?: Period,
   milestoneCompletions: MilestoneCompletion[]
+  existingMetricValues?: MetricValue[]
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -48,11 +55,38 @@ export function InputFormClient({
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedProgramId, setSelectedProgramId] = useState<string>(programs[0]?.id || '')
+  
+  // Dynamic metric state: { metric_definition_id: value_string }
+  const [metricValues, setMetricValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    existingMetricValues.forEach(mv => { init[mv.metric_definition_id] = mv.value?.toString() || '' })
+    return init
+  })
 
   const isLocked = (activePeriod as unknown as { is_locked: boolean | null })?.is_locked
 
   // Get active program details for dynamic rendering
   const activeProgram = programs.find(p => p.id === selectedProgramId)
+  const activeMetrics = (activeProgram?.program_metric_definitions || []).sort((a, b) => a.display_order - b.display_order)
+  const hasCustomMetrics = activeMetrics.length > 0
+
+  // Recalculate on program change
+  useEffect(() => {
+    const init: Record<string, string> = {}
+    existingMetricValues
+      .filter(mv => mv.program_id === selectedProgramId)
+      .forEach(mv => { init[mv.metric_definition_id] = mv.value?.toString() || '' })
+    setMetricValues(init)
+  }, [selectedProgramId, existingMetricValues])
+
+  // Build values map for formula evaluation
+  const metricKeyValues: Record<string, number | null> = {}
+  activeMetrics.forEach(m => {
+    if (m.input_type === 'manual') {
+      const v = metricValues[m.id]
+      metricKeyValues[m.metric_key] = v !== undefined && v !== '' ? Number(v) : null
+    }
+  })
 
   // Handlers
   const handleOpenCreate = () => {
@@ -107,36 +141,61 @@ export function InputFormClient({
     
     const formData = new FormData(e.currentTarget)
     
-    const payload: Partial<DailyInput> = {
-      date: formData.get('date') as string,
-      notes: formData.get('notes') as string,
-    }
-
-    if (!editingId) {
-      payload.program_id = selectedProgramId
-    }
-
-    if (activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid') {
-      const rp = formData.get('achievement_rp')
-      const user = formData.get('achievement_user')
-      if (rp) payload.achievement_rp = Number(rp)
-      if (user) payload.achievement_user = Number(user)
-    }
-
     try {
-      let res;
-      if (editingId) {
-        res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
-      } else {
-        res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+      // Always save legacy daily_input for programs without custom metrics
+      if (!hasCustomMetrics || editingId) {
+        const payload: Partial<DailyInput> = {
+          date: formData.get('date') as string,
+          notes: formData.get('notes') as string,
+        }
+
+        if (!editingId) {
+          payload.program_id = selectedProgramId
+        }
+
+        if (activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid') {
+          const rp = formData.get('achievement_rp')
+          const user = formData.get('achievement_user')
+          if (rp) payload.achievement_rp = Number(rp)
+          if (user) payload.achievement_user = Number(user)
+        }
+
+        let res;
+        if (editingId) {
+          res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+        } else {
+          res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+        }
+        if ('error' in res && res.error) {
+          toast.error(res.error)
+          setIsLoading(false)
+          return
+        }
       }
-      
-      if ('error' in res && res.error) {
-        toast.error(res.error)
-      } else {
-        toast.success(editingId ? 'Data berhasil diperbarui!' : 'Pencapaian harian berhasil dicatat!')
-        setIsModalOpen(false)
+
+      // Save custom metric values if program has them
+      if (hasCustomMetrics && !editingId) {
+        const date = formData.get('date') as string
+        const valuesToSave = activeMetrics
+          .filter(m => m.input_type === 'manual')
+          .map(m => ({
+            metric_definition_id: m.id,
+            value: metricValues[m.id] !== undefined && metricValues[m.id] !== ''
+              ? Number(metricValues[m.id])
+              : null
+          }))
+
+        const res = await submitDailyMetricValues(selectedProgramId, date, valuesToSave)
+        if ('error' in res && res.error) {
+          toast.error(res.error)
+          setIsLoading(false)
+          return
+        }
       }
+
+      toast.success(editingId ? 'Data berhasil diperbarui!' : 'Pencapaian harian berhasil dicatat!')
+      setIsModalOpen(false)
+      setMetricValues({})
     } catch {
       toast.error('Terjadi kesalahan saat menyimpan data.')
     } finally {
@@ -323,7 +382,8 @@ export function InputFormClient({
                     )}
                   </div>
 
-                  {(activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid') && (
+                  {/* Show legacy fields only for programs without custom metrics */}
+                  {!hasCustomMetrics && (activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid') && (
                     <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-5">
                       <div className="flex justify-between items-center text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">
                         <Target className="h-3 w-3" /> Input Angka Target
@@ -346,6 +406,51 @@ export function InputFormClient({
                           />
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Dynamic Metric Fields for programs with custom metrics */}
+                  {hasCustomMetrics && !editingId && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                        <Target className="h-3 w-3" /> Input KPI
+                      </div>
+                      {activeMetrics.map(metric => {
+                        const isCalc = metric.input_type === 'calculated'
+                        const calcVal = isCalc && metric.formula
+                          ? evaluateFormula(metric.formula, metricKeyValues)
+                          : null
+
+                        return (
+                          <div key={metric.id} className={`space-y-1 ${isCalc ? 'opacity-70' : ''}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-600 uppercase">
+                                {metric.label}
+                                {metric.unit_label && <span className="ml-1 text-slate-400 normal-case">({metric.unit_label})</span>}
+                              </label>
+                              {isCalc && <Calculator className="h-3 w-3 text-purple-400" />}
+                            </div>
+                            {isCalc ? (
+                              <div className="w-full text-sm font-bold rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-purple-700">
+                                {calcVal !== null 
+                                  ? formatMetricValue(calcVal, metric.data_type, metric.unit_label)
+                                  : <span className="text-slate-400">— (butuh data lain)</span>
+                                }
+                              </div>
+                            ) : (
+                              <input
+                                type={metric.data_type === 'boolean' ? 'checkbox' : 'number'}
+                                step={metric.data_type === 'float' ? '0.01' : '1'}
+                                min="0"
+                                placeholder={metric.data_type === 'currency' ? 'Rp 0' : '0'}
+                                value={metricValues[metric.id] || ''}
+                                onChange={e => setMetricValues(prev => ({ ...prev, [metric.id]: e.target.value }))}
+                                className="w-full text-sm font-bold rounded-xl border border-slate-200 px-4 py-3 focus:border-indigo-500 outline-none"
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
 
