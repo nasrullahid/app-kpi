@@ -58,7 +58,6 @@ export function ProgramClient({
   const [monthlyRp, setMonthlyRp] = useState<string>('')
   const [monthlyUser, setMonthlyUser] = useState<string>('')
 
-  const workDays = activePeriod?.working_days || 20
 
   const handleOpenCreate = () => {
     setEditingProgramId(null)
@@ -123,6 +122,7 @@ export function ProgramClient({
 
     const formData = new FormData(e.currentTarget)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
       name: formData.get('name') as string,
       pic_ids: selectedPicIds,
@@ -153,17 +153,6 @@ export function ProgramClient({
     }
   }
 
-  async function handleToggleStatus(id: string, currentStatus: boolean) {
-    if (!isAdmin) return
-    setIsLoading(true)
-    const res = await toggleProgramStatus(id, currentStatus)
-    if ('error' in res && res.error) {
-      toast.error(res.error)
-    } else {
-      toast.success(currentStatus ? 'Program dinonaktifkan' : 'Program diaktifkan')
-    }
-    setIsLoading(false)
-  }
 
   // Milestone Actions
   async function handleAddMilestone(e: React.FormEvent<HTMLFormElement>) {
@@ -279,7 +268,7 @@ export function ProgramClient({
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex -space-x-2 overflow-hidden hover:space-x-1 transition-all">
-                      {prog.program_pics.map((p, i) => {
+                      {prog.program_pics.map((p) => {
                         const profile = picProfiles?.find(prof => prof.id === p.profile_id)
                         return (
                           <div 

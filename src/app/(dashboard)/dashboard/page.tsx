@@ -47,6 +47,7 @@ export default async function DashboardPage({
     const myProgramIds = myTeamPrograms?.map(tp => tp.program_id) || []
     programsQuery = programsQuery.in('id', myProgramIds)
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: programs } = await (programsQuery as any) as { data: ProgramWithRelations[] | null }
 
   // 4. Milestone Completions (Fetch all for these programs to ensure persistence)
