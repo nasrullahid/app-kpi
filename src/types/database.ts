@@ -200,6 +200,125 @@ export type Database = {
           },
         ]
       }
+      program_pics: {
+        Row: {
+          created_at: string | null
+          id: string
+          program_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          program_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          program_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_pics_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_pics_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_milestones: {
+        Row: {
+          created_at: string | null
+          id: string
+          program_id: string
+          title: string
+          description: string | null
+          order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          program_id: string
+          title: string
+          description?: string | null
+          order?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          program_id?: string
+          title?: string
+          description?: string | null
+          order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_milestones_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      milestone_completions: {
+        Row: {
+          id: string
+          milestone_id: string
+          period_id: string
+          is_completed: boolean
+          notes: string | null
+          evidence_url: string | null
+          completed_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          milestone_id: string
+          period_id: string
+          is_completed?: boolean
+          notes?: string | null
+          evidence_url?: string | null
+          completed_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          milestone_id?: string
+          period_id?: string
+          is_completed?: boolean
+          notes?: string | null
+          evidence_url?: string | null
+          completed_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestone_completions_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "program_milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "milestone_completions_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

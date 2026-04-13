@@ -27,12 +27,19 @@ export default async function InputHarianPage() {
     .eq('is_active', true)
     .single()
 
-  // 2. Fetch Active Programs
+  // 2. Fetch Active Programs with Milestones
   const { data: activePrograms } = await supabase
     .from('programs')
-    .select('*')
+    .select('*, program_milestones(*)')
     .eq('is_active', true)
     .order('name')
+
+  // Fetch ALL Milestone Completions for active programs to ensure persistence
+  const allMilestoneIds = activePrograms?.flatMap(p => (p as any).program_milestones?.map((m: any) => m.id)) || []
+  const { data: milestoneCompletions } = await supabase
+    .from('milestone_completions')
+    .select('*')
+    .in('milestone_id', allMilestoneIds)
 
   // Fetch User Role
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -100,10 +107,11 @@ export default async function InputHarianPage() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             {activePrograms && activePrograms.length > 0 ? (
               <InputFormClient 
-                programs={activePrograms} 
+                programs={activePrograms || []} 
                 pastInputs={pastInputs} 
                 isAdmin={isAdmin}
                 activePeriod={activePeriod}
+                milestoneCompletions={milestoneCompletions || []}
               />
             ) : (
               <div className="text-center py-8">

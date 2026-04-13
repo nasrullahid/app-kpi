@@ -13,7 +13,7 @@ interface Slide2Props {
 
 export function Slide2Programs({ programs, pagination }: Slide2Props) {
   return (
-    <div className="h-full flex flex-col p-12">
+    <div className="h-full flex flex-col p-12 text-left">
       <div className="flex justify-between items-end mb-12">
          <div>
             <h1 className="text-5xl font-black text-slate-100 uppercase tracking-tighter">
@@ -49,12 +49,6 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
     'PERLU PERHATIAN': 'text-rose-400 bg-rose-500/10 border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
   }
 
-  const milestoneColors = {
-    'not_started': 'bg-slate-800 text-slate-400 border-slate-700',
-    'in_progress': 'bg-amber-500/20 text-amber-500 border-amber-500/30',
-    'completed': 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30'
-  }
-
   const barColors = {
     'TERCAPAI': 'bg-emerald-500',
     'MENUJU TARGET': 'bg-amber-500',
@@ -63,19 +57,27 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
 
   return (
     <div className="bg-slate-900/40 rounded-3xl p-8 border border-slate-800/80 flex flex-col justify-between shadow-xl backdrop-blur-sm relative overflow-hidden group">
-      {/* Background Type Label */}
       <div className="absolute -right-4 -top-4 opacity-[0.03] text-8xl font-black uppercase pointer-events-none rotate-12">
         {program.target_type}
       </div>
 
       <div className="flex justify-between items-start mb-6 gap-4 relative z-10">
         <div className="flex-1 min-w-0">
-          <h3 className="text-3xl font-extrabold text-slate-100 truncate mb-1 leading-tight">
+          <h3 className="text-3xl font-extrabold text-slate-100 truncate mb-2 leading-tight">
              {program.name}
           </h3>
-          <p className="text-lg font-bold text-slate-200 uppercase tracking-widest">
-             PIC: <span className="text-slate-100 font-black">{program.pic_name}</span>
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {program.team.map((m, i) => (
+                <div key={i} title={m.name} className="h-8 w-8 rounded-full border-2 border-slate-900 bg-indigo-600 flex items-center justify-center text-[10px] font-black text-white">
+                  {m.name.substring(0,2).toUpperCase()}
+                </div>
+              ))}
+            </div>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest ml-2">
+               TEAM PIC ({program.team.length})
+            </p>
+          </div>
         </div>
         <div className="flex flex-col gap-2 items-end">
           <div className={cn(
@@ -84,23 +86,25 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
           )}>
             {program.status}
           </div>
-          {(isQualitative || isHybrid) && (
-            <div className={cn(
-              "px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest",
-              milestoneColors[program.latestQualitativeStatus || 'not_started']
-            )}>
-              {program.latestQualitativeStatus?.replace('_', ' ') || 'NOT STARTED'}
-            </div>
-          )}
         </div>
       </div>
 
       <div className="space-y-6 relative z-10">
+        {/* Progress Display */}
         {isQualitative ? (
-          <div className="bg-slate-950/40 p-6 rounded-2xl border border-slate-800/50 min-h-[140px] flex flex-col justify-center">
-             <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mb-2 block">Kualitatif Milestone</span>
-             <p className="text-xl font-bold text-slate-100 leading-snug line-clamp-3">
-                {program.qualitative_description || 'Tidak ada deskripsi kualitatif.'}
+          <div className="space-y-4">
+             <div className="flex justify-between items-end">
+                <span className="text-sm font-bold text-slate-200 uppercase tracking-[0.2em]">Misi Kualitatif</span>
+                <span className="text-2xl font-black text-purple-400">{program.qualitativePercentage.toFixed(0)}%</span>
+             </div>
+             <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+               <div 
+                 className="h-full bg-purple-500 transition-all duration-1000 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                 style={{ width: `${Math.min(program.qualitativePercentage, 100)}%` }}
+               />
+             </div>
+             <p className="text-sm text-slate-400 font-medium line-clamp-2 italic">
+               &quot;{program.qualitative_description}&quot;
              </p>
           </div>
         ) : (
@@ -108,27 +112,42 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
             {/* Rp Metric */}
             <div className="space-y-2">
                <div className="flex justify-between items-end">
-                  <span className="text-sm font-bold text-slate-200 uppercase tracking-widest">Pencapaian Rp</span>
+                  <span className="text-sm font-bold text-slate-200 uppercase tracking-widest">Target Rp Bulanan</span>
                   <div className="flex items-baseline gap-2">
                      <span className="text-2xl font-black text-slate-100">{formatRupiah(program.achievementRp)}</span>
-                     <span className="text-xs font-bold text-slate-300">/ {formatRupiah(program.monthly_target_rp || 0)}</span>
+                     <span className="text-xs font-bold text-slate-400 text-opacity-50">/ {formatRupiah(program.monthly_target_rp || 0)}</span>
                   </div>
                </div>
                <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
                  <div 
-                   className={cn("h-full transition-all duration-1000 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]", barColors[program.status])}
+                   className={cn("h-full transition-all duration-1000 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)]", barColors[program.status])}
                    style={{ width: `${Math.min(program.percentageRp, 100)}%` }}
                  />
                </div>
             </div>
 
+            {isHybrid && (
+               <div className="pt-2">
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase text-purple-400 tracking-widest mb-1.5">
+                     <span>Milestone Persisten</span>
+                     <span>{program.qualitativePercentage.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                     <div 
+                        className="h-full bg-purple-500 transition-all duration-1000"
+                        style={{ width: `${Math.min(program.qualitativePercentage, 100)}%` }}
+                     />
+                  </div>
+               </div>
+            )}
+
             {/* User Metric */}
             <div className="space-y-2">
                <div className="flex justify-between items-end">
-                  <span className="text-sm font-bold text-slate-200 uppercase tracking-widest">Pencapaian User</span>
+                  <span className="text-sm font-bold text-slate-200 uppercase tracking-widest">Target User</span>
                   <div className="flex items-baseline gap-2">
                      <span className="text-2xl font-black text-slate-100">{program.achievementUser.toLocaleString()}</span>
-                     <span className="text-xs font-bold text-slate-300">/ {(program.monthly_target_user || 0).toLocaleString()}</span>
+                     <span className="text-xs font-bold text-slate-400 text-opacity-50">/ {(program.monthly_target_user || 0).toLocaleString()}</span>
                   </div>
                </div>
                <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">

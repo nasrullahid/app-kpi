@@ -12,9 +12,7 @@ export type ActionResponse = { error: string } | { success: boolean; data?: unkn
 
 export async function createProgram(data: {
   name: string
-  pic_id: string | null
-  pic_name: string
-  pic_whatsapp?: string | null
+  pic_ids: string[]
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null
   monthly_target_user?: number | null
@@ -30,14 +28,37 @@ export async function createProgram(data: {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa membuat program.' }
 
-  const { error } = await supabase.from('programs').insert(data)
+  const { pic_ids, ...programData } = data
 
-  if (error) {
-    console.error('Create Program Error:', error)
-    return { error: error.message }
+  // Insert Program
+  // Note: We'll set pic_id to the first PIC for legacy compatibility if needed
+  const { data: program, error: progError } = await supabase
+    .from('programs')
+    .insert({
+      ...programData,
+      pic_id: pic_ids.length > 0 ? pic_ids[0] : null,
+      pic_name: 'Team', // Legacy fallback
+    })
+    .select()
+    .single()
+
+  if (progError) {
+    console.error('Create Program Error:', progError)
+    return { error: progError.message }
+  }
+
+  // Insert Team Members
+  if (pic_ids.length > 0) {
+    const teamData = pic_ids.map(pid => ({
+      program_id: program.id,
+      profile_id: pid
+    }))
+    const { error: teamError } = await supabase.from('program_pics').insert(teamData)
+    if (teamError) console.error('Team Insert Warning:', teamError)
   }
 
   revalidatePath('/master-data')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -62,9 +83,7 @@ export async function toggleProgramStatus(id: string, currentStatus: boolean): P
 
 export async function updateProgram(id: string, data: {
   name: string
-  pic_id: string | null
-  pic_name: string
-  pic_whatsapp?: string | null
+  pic_ids: string[]
   target_type: 'quantitative' | 'qualitative' | 'hybrid'
   monthly_target_rp?: number | null
   monthly_target_user?: number | null
@@ -80,14 +99,91 @@ export async function updateProgram(id: string, data: {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa mengubah program.' }
 
-  const { error } = await supabase.from('programs')
-    .update(data)
+  const { pic_ids, ...programData } = data
+
+  // Update Program
+  const { error: progError } = await supabase.from('programs')
+    .update({
+      ...programData,
+      pic_id: pic_ids.length > 0 ? pic_ids[0] : null
+    })
     .eq('id', id)
 
-  if (error) {
-    console.error('Update Program Error:', error)
-    return { error: error.message }
+  if (progError) {
+    console.error('Update Program Error:', progError)
+    return { error: progError.message }
   }
+
+  // Update Team Members (Delete and Re-insert)
+  await supabase.from('program_pics').delete().eq('program_id', id)
+  
+  if (pic_ids.length > 0) {
+    const teamData = pic_ids.map(pid => ({
+      program_id: id,
+      profile_id: pid
+    }))
+    const { error: teamError } = await supabase.from('program_pics').insert(teamData)
+    if (teamError) console.error('Team Update Warning:', teamError)
+  }
+
+  revalidatePath('/master-data')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
+ * MILESTONES (TASKS)
+ */
+
+export async function addMilestone(data: {
+  program_id: string
+  title: string
+  description?: string | null
+  order?: number
+}): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa menambah tugas.' }
+
+  const { error } = await supabase.from('program_milestones').insert(data)
+  if (error) return { error: error.message }
+
+  revalidatePath('/master-data')
+  return { success: true }
+}
+
+export async function updateMilestone(id: string, data: {
+  title: string
+  description?: string | null
+  order?: number
+}): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa mengubah tugas.' }
+
+  const { error } = await supabase.from('program_milestones').update(data).eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/master-data')
+  return { success: true }
+}
+
+export async function deleteMilestone(id: string): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa menghapus tugas.' }
+
+  const { error } = await supabase.from('program_milestones').delete().eq('id', id)
+  if (error) return { error: error.message }
 
   revalidatePath('/master-data')
   return { success: true }

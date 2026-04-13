@@ -26,18 +26,40 @@ export default async function DashboardPage({
   // 2. Active Period
   const { data: activePeriod } = await supabase.from('periods').select('*').eq('is_active', true).single()
 
-  let programsQuery = supabase.from('programs').select('*').eq('is_active', true)
+  // 3. Programs and Team Access
+  let programsQuery = supabase
+    .from('programs')
+    .select('*, program_pics(profile_id), program_milestones(*)')
+    .eq('is_active', true)
+
   if (!isAdmin && user) {
-    // PIC can only see their own programs based on assigned pic_client_id (or similar)
-    // Checking pic_id field from migration
-    programsQuery = programsQuery.eq('pic_id', user.id)
+    // PIC can only see programs where they are in the team
+    const { data: myTeamPrograms } = await supabase
+      .from('program_pics')
+      .select('program_id')
+      .eq('profile_id', user.id)
+    
+    const myProgramIds = myTeamPrograms?.map(tp => tp.program_id) || []
+    programsQuery = programsQuery.in('id', myProgramIds)
   }
   const { data: programs } = await programsQuery
 
-  // 4. Daily Inputs
+  // 4. Milestone Completions (Fetch all for these programs to ensure persistence)
+  const allMilestoneIds = programs?.flatMap(p => (p as any).program_milestones?.map((m: any) => m.id)) || []
+  const { data: milestoneCompletions } = await supabase
+    .from('milestone_completions')
+    .select('*')
+    .in('milestone_id', allMilestoneIds)
+
+  // 5. PIC Profiles for display names
+  const { data: picProfiles } = await supabase
+    .from('profiles')
+    .select('id, name')
+
+  // 6. Daily Inputs
   let dailyInputs: DailyInput[] = []
-  if (activePeriod && programs && (programs as Program[]).length > 0) {
-    const programIds = (programs as Program[]).map((p: Program) => p.id)
+  if (activePeriod && programs && (programs as any[]).length > 0) {
+    const programIds = (programs as any[]).map((p: any) => p.id)
     
     let query = supabase
       .from('daily_inputs')
@@ -51,7 +73,6 @@ export default async function DashboardPage({
     }
 
     const { data: inputs } = await query.order('date', { ascending: true })
-      
     dailyInputs = inputs || []
   }
 
@@ -88,10 +109,12 @@ export default async function DashboardPage({
       ) : programs && programs.length > 0 ? (
         <Suspense fallback={<div className="h-96 w-full animate-pulse bg-slate-100 rounded-xl" />}>
           <DashboardClient 
-            programs={programs} 
+            programs={programs as any} 
             dailyInputs={dailyInputs} 
             activePeriod={activePeriod}
             initialFilters={filterStrings}
+            milestoneCompletions={milestoneCompletions || []}
+            picProfiles={picProfiles || []}
           />
         </Suspense>
       ) : (

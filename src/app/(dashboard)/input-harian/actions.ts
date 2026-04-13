@@ -114,3 +114,54 @@ export async function deleteDailyInput(id: string): Promise<ActionResponse> {
   revalidatePath('/input-harian')
   return { success: true }
 }
+
+/**
+ * MILESTONE SUBMISSIONS
+ */
+
+export async function submitMilestoneCompletion(data: {
+  milestone_id: string
+  is_completed: boolean
+  notes?: string | null
+  evidence_url?: string | null
+}): Promise<ActionResponse> {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Get active period
+  const { data: period } = await supabase
+    .from('periods')
+    .select('id, is_locked')
+    .eq('is_active', true)
+    .single()
+
+  if (!period) return { error: 'Tidak ada periode aktif.' }
+  if (period.is_locked) return { error: 'Periode dikunci.' }
+
+  const { milestone_id, is_completed, notes, evidence_url } = data
+
+  const { error } = await supabase
+    .from('milestone_completions')
+    .upsert({
+      milestone_id,
+      period_id: period.id,
+      is_completed,
+      notes,
+      evidence_url,
+      completed_at: is_completed ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'milestone_id,period_id'
+    })
+
+  if (error) {
+    console.error('Milestone Submit Error:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/input-harian')
+  revalidatePath('/dashboard')
+  return { success: true }
+}

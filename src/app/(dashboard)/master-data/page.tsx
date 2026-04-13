@@ -22,7 +22,7 @@ export default async function MasterDataPage({
   // Fetch Data
   const { data: programs } = await supabase
     .from('programs')
-    .select('*')
+    .select('*, program_pics(profile_id), program_milestones(*)')
     .order('created_at', { ascending: false })
 
   const { data: periods } = await supabase
