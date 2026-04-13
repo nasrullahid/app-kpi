@@ -11,6 +11,7 @@ import {
   updateMetricDefinition,
   deleteMetricDefinition,
   applyMetricTemplate,
+  getMetricDefinitions,
 } from '../../../metric-actions'
 import {
   Plus,
@@ -171,12 +172,24 @@ export function MetricsClient({ program, initialMetrics }: MetricsClientProps) {
 
     setIsLoading(true)
     const res = await applyMetricTemplate(program.id, template.metrics)
+
+    if ('error' in res) {
+      setIsLoading(false)
+      return toast.error(res.error)
+    }
+
+    // Fetch the saved metrics directly and update state — no manual refresh needed
+    const fetchRes = await getMetricDefinitions(program.id)
     setIsLoading(false)
 
-    if ('error' in res) return toast.error(res.error)
-    toast.success(`Template "${template.label}" diterapkan!`)
+    if (fetchRes.error || !fetchRes.data) {
+      toast.error('Template diterapkan, tapi gagal memuat ulang. Coba refresh halaman.')
+      return
+    }
+
+    setRows(fetchRes.data.map((m, i) => toMetricRow(m, i)))
     setShowTemplates(false)
-    router.refresh()
+    toast.success(`Template "${template.label}" diterapkan! ${fetchRes.data.length} metrik dimuat.`)
   }
 
   // ── Save all dirty / new rows ─────────────────────────────────────────────

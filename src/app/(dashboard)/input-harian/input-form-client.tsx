@@ -142,38 +142,38 @@ export function InputFormClient({
     const formData = new FormData(e.currentTarget)
     
     try {
-      // Always save legacy daily_input for programs without custom metrics
-      if (!hasCustomMetrics || editingId) {
-        const payload: Partial<DailyInput> = {
-          date: formData.get('date') as string,
-          notes: formData.get('notes') as string,
-        }
-
-        if (!editingId) {
-          payload.program_id = selectedProgramId
-        }
-
-        if (activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid') {
-          const rp = formData.get('achievement_rp')
-          const user = formData.get('achievement_user')
-          if (rp) payload.achievement_rp = Number(rp)
-          if (user) payload.achievement_user = Number(user)
-        }
-
-        let res;
-        if (editingId) {
-          res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
-        } else {
-          res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
-        }
-        if ('error' in res && res.error) {
-          toast.error(res.error)
-          setIsLoading(false)
-          return
-        }
+      // ALWAYS save to daily_inputs (anchor record for the table display)
+      const payload: Partial<DailyInput> = {
+        date: formData.get('date') as string,
+        notes: formData.get('notes') as string,
       }
 
-      // Save custom metric values if program has them
+      if (!editingId) {
+        payload.program_id = selectedProgramId
+      }
+
+      // For legacy programs (no custom metrics), also save rp/user values
+      if (!hasCustomMetrics && (activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid')) {
+        const rp = formData.get('achievement_rp')
+        const user = formData.get('achievement_user')
+        if (rp) payload.achievement_rp = Number(rp)
+        if (user) payload.achievement_user = Number(user)
+      }
+
+      let res;
+      if (editingId) {
+        res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+      } else {
+        res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+      }
+
+      if ('error' in res && res.error) {
+        toast.error(res.error)
+        setIsLoading(false)
+        return
+      }
+
+      // Save custom metric values if program has them (new entry only)
       if (hasCustomMetrics && !editingId) {
         const date = formData.get('date') as string
         const valuesToSave = activeMetrics
@@ -185,9 +185,9 @@ export function InputFormClient({
               : null
           }))
 
-        const res = await submitDailyMetricValues(selectedProgramId, date, valuesToSave)
-        if ('error' in res && res.error) {
-          toast.error(res.error)
+        const mvRes = await submitDailyMetricValues(selectedProgramId, date, valuesToSave)
+        if ('error' in mvRes && mvRes.error) {
+          toast.error(mvRes.error)
           setIsLoading(false)
           return
         }
