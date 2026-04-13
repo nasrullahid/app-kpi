@@ -5,6 +5,8 @@ import { Database } from '@/types/database'
 
 export type Milestone = Database['public']['Tables']['program_milestones']['Row']
 export type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
+export type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+export type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 
 export type Program = Database['public']['Tables']['programs']['Row'] & {
   program_pics: { profile_id: string }[]
@@ -56,6 +58,8 @@ export interface TVDashboardData {
   programs: ProgramPerformance[]
   pics: PICPerformance[]
   rawInputs: DailyInput[]
+  metricDefinitions: MetricDefinition[]
+  metricValues: MetricValue[]
 }
 
 export async function getTVDashboardData(): Promise<TVDashboardData> {
@@ -84,7 +88,9 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       },
       programs: [],
       pics: [],
-      rawInputs: []
+      rawInputs: [],
+      metricDefinitions: [],
+      metricValues: []
     }
   }
 
@@ -207,6 +213,20 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
   
   const aggPercentageRp = totalTargetRp > 0 ? (totalAchievementRp / totalTargetRp) * 100 : 0
 
+  // 9. Fetch Metric Definitions + Values
+  const programIds = rawPrograms.map(p => p.id)
+
+  const { data: metricDefData } = await supabase
+    .from('program_metric_definitions')
+    .select('*')
+    .in('program_id', programIds)
+
+  const { data: metricValueData } = await supabase
+    .from('daily_metric_values')
+    .select('*')
+    .in('program_id', programIds)
+    .eq('period_id', activePeriod.id)
+
   return {
     activePeriod,
     aggregate: {
@@ -222,6 +242,8 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     },
     programs: programPerformance,
     pics: picPerformance,
-    rawInputs: inputs
+    rawInputs: inputs,
+    metricDefinitions: (metricDefData as MetricDefinition[]) || [],
+    metricValues: (metricValueData as MetricValue[]) || []
   }
 }

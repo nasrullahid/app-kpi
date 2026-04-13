@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
+import { formatMetricValue } from '@/lib/formula-evaluator'
+import { getDepartmentConfig, DEPARTMENTS } from '@/lib/department-config'
 import {
   BarChart,
   Bar,
@@ -250,7 +252,8 @@ export function DashboardClient({
   activePeriod, 
   initialFilters, 
   milestoneCompletions,
-  picProfiles 
+  picProfiles,
+  metricValues = []
 }: DashboardClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -258,6 +261,7 @@ export function DashboardClient({
 
   const [filterType, setFilterType] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterDepartment, setFilterDepartment] = useState<string>('all')
   
   // Date range state
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -380,12 +384,13 @@ export function DashboardClient({
   const filteredData = useMemo(() => {
     let result = aggregatedData
     if (filterType !== 'all') result = result.filter(p => p.target_type === filterType)
+    if (filterDepartment !== 'all') result = result.filter(p => p.department === filterDepartment)
     if (filterStatus !== 'all') {
       if (filterStatus === 'TERCAPAI') result = result.filter(p => p.business_status === 'TERCAPAI' || p.business_status === 'TERLAMPAUI')
       else result = result.filter(p => p.business_status === filterStatus)
     }
     return result.sort((a, b) => b.percentage_rp - a.percentage_rp)
-  }, [aggregatedData, filterType, filterStatus])
+  }, [aggregatedData, filterType, filterStatus, filterDepartment])
 
   // Chart 1: Daily Trend Data (Cumulative)
   const dailyTrendData = useMemo(() => {
@@ -664,12 +669,12 @@ export function DashboardClient({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
+        <div className="flex items-center gap-2">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TIPE:</span>
           <select 
             value={filterType} onChange={e => setFilterType(e.target.value)}
-            className="w-full sm:w-auto text-xs font-bold border-slate-200 rounded-lg bg-slate-50 px-2 py-1.5 outline-none focus:border-indigo-400"
+            className="text-xs font-bold border-slate-200 rounded-lg bg-slate-50 px-2 py-1.5 outline-none focus:border-indigo-400"
           >
             <option value="all">SEMUA</option>
             <option value="quantitative">KUANTITATIF</option>
@@ -677,11 +682,21 @@ export function DashboardClient({
             <option value="hybrid">HYBRID</option>
           </select>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DEPT:</span>
+          <select 
+            value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}
+            className="text-xs font-bold border-slate-200 rounded-lg bg-slate-50 px-2 py-1.5 outline-none focus:border-indigo-400"
+          >
+            <option value="all">SEMUA DEPT</option>
+            {DEPARTMENTS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">STATUS:</span>
           <select 
             value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="w-full sm:w-auto text-xs font-bold border-slate-200 rounded-lg bg-slate-50 px-2 py-1.5 outline-none focus:border-indigo-400"
+            className="text-xs font-bold border-slate-200 rounded-lg bg-slate-50 px-2 py-1.5 outline-none focus:border-indigo-400"
           >
             <option value="all">SEMUA</option>
             <option value="TERCAPAI">TERCAPAI/LAMP</option>
@@ -701,14 +716,22 @@ export function DashboardClient({
           const isQual = program.target_type === 'qualitative' || program.target_type === 'hybrid'
           const visualProgress = Math.min(Math.max(program.percentage_rp, 0), 100)
           const qualProgress = Math.min(Math.max(program.qualitative_percentage, 0), 100)
+          
+          // Custom metrics for this program
+          const programMetrics = (program.program_metric_definitions || [])
+            .filter(m => m.is_target_metric && m.show_on_dashboard)
+            .sort((a, b) => a.display_order - b.display_order)
+          const hasCustomMetrics = programMetrics.length > 0
+          const dept = getDepartmentConfig(program.department || 'general')
 
           return (
             <div key={program.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all overflow-hidden flex flex-col group relative">
               <div className="p-6">
-                <div className="flex justify-between items-start mb-6 gap-2">
+                <div className="flex justify-between items-start mb-4 gap-2">
                   <div className="flex flex-col">
                     <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{program.name}</h3>
-                    <div className="flex items-center gap-1.5 mt-2">
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${dept.color} ${dept.textColor}`}>{dept.label}</span>
                       <div className="flex -space-x-1.5 overflow-hidden">
                         {program.team.map((m, i) => (
                           <div key={i} title={m.name} className="h-5 w-5 rounded-full ring-2 ring-white bg-indigo-100 flex items-center justify-center text-[8px] font-black text-indigo-700 border border-indigo-200">
@@ -722,9 +745,57 @@ export function DashboardClient({
                   {getStatusBadge(program.business_status)}
                 </div>
 
-                <div className="space-y-6">
-                  {/* QUANT PERFORMANCE */}
-                  {isQuant && (
+                <div className="space-y-5">
+                  {/* CUSTOM METRIC PROGRESS BARS */}
+                  {hasCustomMetrics && (
+                    <div className="space-y-3">
+                      {programMetrics.map(metric => {
+                        const metricVals = metricValues.filter(mv => mv.metric_definition_id === metric.id && mv.program_id === program.id)
+                        const achieved = metricVals.reduce((sum, mv) => sum + Number(mv.value || 0), 0)
+                        const target = Number(metric.monthly_target || 0) * prorationFactor
+                        const isLower = metric.target_direction === 'lower_is_better'
+                        const rawPct = target > 0 ? (achieved / target) * 100 : 0
+                        const effectivePct = isLower ? (target > 0 ? Math.max(0, 100 - rawPct + 100) : 0) : rawPct
+                        const barPct = Math.min(Math.max(effectivePct, 0), 100)
+                        const barColor = effectivePct >= 100 ? 'bg-emerald-500' : effectivePct >= 50 ? 'bg-amber-400' : 'bg-red-500'
+
+                        return (
+                          <div key={metric.id}>
+                            <div className="flex justify-between items-end mb-1">
+                              <div>
+                                <span className="text-[9px] uppercase font-black text-slate-300 tracking-widest block">{metric.label}</span>
+                                <span className="text-base font-black text-slate-800">
+                                  {metric.data_type === 'currency'
+                                    ? formatRupiah(achieved)
+                                    : formatMetricValue(achieved, metric.data_type, metric.unit_label)}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[9px] uppercase font-black text-slate-300 tracking-widest block">Target</span>
+                                <span className="text-xs font-bold text-slate-500">
+                                  {metric.data_type === 'currency'
+                                    ? formatRupiah(target)
+                                    : formatMetricValue(target, metric.data_type, metric.unit_label)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <div className="flex justify-between text-[10px] font-black mb-1 uppercase">
+                                <span className="text-slate-400">{isLower ? '↓ Lower is better' : 'Yield Progress'}</span>
+                                <span className={rawPct >= 100 ? 'text-emerald-600' : 'text-slate-600'}>{rawPct.toFixed(1)}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                                <div className={cn('h-full rounded-full transition-all duration-1000', barColor)} style={{ width: `${barPct}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* LEGACY QUANT PERFORMANCE (no custom metrics) */}
+                  {!hasCustomMetrics && isQuant && (
                     <div className="space-y-3">
                       <div className="flex justify-between items-end pb-1">
                         <div className="flex flex-col">
@@ -762,7 +833,7 @@ export function DashboardClient({
 
                   {/* QUAL PERFORMANCE */}
                   {isQual && (
-                    <div className={cn("pt-4 space-y-3", isQuant && "border-t border-slate-100")}>
+                    <div className={cn("pt-4 space-y-3", (hasCustomMetrics || isQuant) && "border-t border-slate-100")}>
                       <div className="flex items-center justify-between">
                          <h4 className="text-[9px] uppercase font-black text-purple-600 tracking-widest flex items-center gap-1.5">
                            <CheckCircle2 className="h-3 w-3" /> Misi Kualitatif
@@ -788,7 +859,10 @@ export function DashboardClient({
                 </div>
               </div>
               <div className="mt-auto px-6 py-4 bg-slate-50/50 border-t border-slate-50 flex justify-between items-center text-[10px] font-black uppercase text-slate-400">
-                <span>Daily Pro-rata: {formatRupiah(program.per_day_target_rp)}</span>
+                {hasCustomMetrics 
+                  ? <span>{programMetrics.length} KPI Aktif · Custom Metrics</span>
+                  : <span>Daily Pro-rata: {formatRupiah(program.per_day_target_rp)}</span>
+                }
                 <span className="text-indigo-400">Team Active</span>
               </div>
             </div>

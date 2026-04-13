@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { ProgramPerformance, DailyInput, Milestone } from '../actions'
+import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
+import { formatMetricValue } from '@/lib/formula-evaluator'
 import { 
   AreaChart, 
   Area, 
@@ -15,9 +17,14 @@ import {
 } from 'recharts'
 import { CheckCircle2, ClipboardList, Target, TrendingUp } from 'lucide-react'
 
+type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
+type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
+
 interface SlideProgramDetailProps {
   program: ProgramPerformance
   inputs: DailyInput[]
+  metricDefinitions?: MetricDefinition[]
+  metricValues?: MetricValue[]
 }
 
 // ── Ring Progress SVG ─────────────────────────────────────────────────────────
@@ -113,7 +120,7 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps) {
+export function SlideProgramDetail({ program, inputs, metricDefinitions = [], metricValues = [] }: SlideProgramDetailProps) {
   const [time, setTime]       = useState('')
   const [dateStr, setDateStr] = useState('')
 
@@ -152,6 +159,12 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
   // ── Derived values ──────────────────────────────────────────────────────────
   const isQualitative = program.target_type === 'qualitative'
   const isHybrid      = program.target_type === 'hybrid'
+
+  // Custom metrics for TV display
+  const tvMetrics = metricDefinitions
+    .filter(m => m.is_target_metric && m.show_on_tv)
+    .sort((a, b) => a.display_order - b.display_order)
+  const hasCustomMetrics = tvMetrics.length > 0
 
   const capPct  = Math.min(((program.achievementRp || 0)   / (program.monthly_target_rp   || 1)) * 100, 100)
   const userPct = Math.min(((program.achievementUser || 0) / (program.monthly_target_user || 1)) * 100, 100)
@@ -365,49 +378,90 @@ export function SlideProgramDetail({ program, inputs }: SlideProgramDetailProps)
         <div className="flex flex-col gap-4 overflow-hidden min-h-0">
           {!isQualitative ? (
             <>
-              {/* Metric cards */}
-              <div className="grid grid-cols-2 gap-4 shrink-0">
-                {/* Capital */}
-                <Card className="p-5" accentColor="#00d4ff">
-                  <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
-                    Target Capital (RP)
-                  </div>
-                  <div
-                    className="text-3xl font-black text-white mb-1"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                  >
-                    {formatRupiah(program.achievementRp)}
-                  </div>
-                  <div className="text-[10px] text-slate-500 uppercase mb-3">
-                    Budget: {formatRupiah(program.monthly_target_rp || 0)}
-                  </div>
-                  <ProgressBar pct={capPct} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
-                  <div className="text-[10px] text-slate-500 mt-1.5">
-                    Pencapaian:{' '}
-                    <span className="text-cyan-400 font-bold">{capPct.toFixed(1)}%</span>
-                  </div>
-                </Card>
+              {/* Metric cards — custom or legacy */}
+              <div className={`grid gap-4 shrink-0 ${tvMetrics.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {hasCustomMetrics ? (
+                  tvMetrics.map(metric => {
+                    const vals = metricValues.filter(mv => mv.metric_definition_id === metric.id)
+                    const achieved = vals.reduce((sum, mv) => sum + Number(mv.value || 0), 0)
+                    const target = Number(metric.monthly_target || 0)
+                    const pct = target > 0 ? Math.min((achieved / target) * 100, 100) : 0
+                    const isLower = metric.target_direction === 'lower_is_better'
 
-                {/* Users */}
-                <Card className="p-5" accentColor="#00ff9d">
-                  <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">
-                    User Density
-                  </div>
-                  <div
-                    className="text-3xl font-black mb-1"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
-                  >
-                    {program.achievementUser.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-500 uppercase mb-3">
-                    Goal: {(program.monthly_target_user || 0).toLocaleString()} peserta
-                  </div>
-                  <ProgressBar pct={userPct} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
-                  <div className="text-[10px] text-slate-500 mt-1.5">
-                    Pencapaian:{' '}
-                    <span className="text-emerald-400 font-bold">{userPct.toFixed(1)}%</span>
-                  </div>
-                </Card>
+                    return (
+                      <Card key={metric.id} className="p-5" accentColor="#00d4ff">
+                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
+                          {metric.label}
+                        </div>
+                        <div
+                          className="text-3xl font-black text-white mb-1"
+                          style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                        >
+                          {metric.data_type === 'currency'
+                            ? formatRupiah(achieved)
+                            : formatMetricValue(achieved, metric.data_type, metric.unit_label)}
+                        </div>
+                        <div className="text-[10px] text-slate-500 uppercase mb-3">
+                          Target: {metric.data_type === 'currency'
+                            ? formatRupiah(target)
+                            : formatMetricValue(target, metric.data_type, metric.unit_label)}
+                        </div>
+                        <ProgressBar
+                          pct={isLower ? Math.max(0, 100 - pct + 100) : pct}
+                          color="linear-gradient(90deg, #00aacc, #00d4ff)"
+                        />
+                        <div className="text-[10px] text-slate-500 mt-1.5">
+                          {isLower ? '↓ Lower better' : 'Pencapaian'}:{' '}
+                          <span className="text-cyan-400 font-bold">{pct.toFixed(1)}%</span>
+                        </div>
+                      </Card>
+                    )
+                  })
+                ) : (
+                  <>
+                    {/* Legacy Capital */}
+                    <Card className="p-5" accentColor="#00d4ff">
+                      <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
+                        Target Capital (RP)
+                      </div>
+                      <div
+                        className="text-3xl font-black text-white mb-1"
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                      >
+                        {formatRupiah(program.achievementRp)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase mb-3">
+                        Budget: {formatRupiah(program.monthly_target_rp || 0)}
+                      </div>
+                      <ProgressBar pct={capPct} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
+                      <div className="text-[10px] text-slate-500 mt-1.5">
+                        Pencapaian:{' '}
+                        <span className="text-cyan-400 font-bold">{capPct.toFixed(1)}%</span>
+                      </div>
+                    </Card>
+
+                    {/* Legacy Users */}
+                    <Card className="p-5" accentColor="#00ff9d">
+                      <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">
+                        User Density
+                      </div>
+                      <div
+                        className="text-3xl font-black mb-1"
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
+                      >
+                        {program.achievementUser.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase mb-3">
+                        Goal: {(program.monthly_target_user || 0).toLocaleString()} peserta
+                      </div>
+                      <ProgressBar pct={userPct} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
+                      <div className="text-[10px] text-slate-500 mt-1.5">
+                        Pencapaian:{' '}
+                        <span className="text-emerald-400 font-bold">{userPct.toFixed(1)}%</span>
+                      </div>
+                    </Card>
+                  </>
+                )}
               </div>
 
               {/* Trend chart */}

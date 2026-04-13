@@ -130,7 +130,16 @@ export default function TVDashboardPage() {
       const progIdx = activeSlide - currentIdx
       const program = data.programs[progIdx]
       const programInputs = (data.rawInputs || []).filter(i => i.program_id === program.id)
-      return <SlideProgramDetail program={program} inputs={programInputs} />
+      const programMetricDefs = (data.metricDefinitions || []).filter(m => m.program_id === program.id)
+      const programMetricValues = (data.metricValues || []).filter(mv => mv.program_id === program.id)
+      return (
+        <SlideProgramDetail
+          program={program}
+          inputs={programInputs}
+          metricDefinitions={programMetricDefs}
+          metricValues={programMetricValues}
+        />
+      )
     }
     currentIdx += totalProgramDetailSlides
 
