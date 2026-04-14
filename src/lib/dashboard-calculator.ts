@@ -208,11 +208,11 @@ export function aggregateByMetricGroup(
   prorationFactor: number,
   workingDaysInPeriod: number
 ) {
-  const groupRawTotals: Record<string, { actual: number, target: number }> = {
-    revenue: { actual: 0, target: 0 },
-    user_acquisition: { actual: 0, target: 0 },
-    ad_spend: { actual: 0, target: 0 },
-    leads: { actual: 0, target: 0 }
+  const groupRawTotals: Record<string, { actual: number, target: number, totalTarget: number }> = {
+    revenue: { actual: 0, target: 0, totalTarget: 0 },
+    user_acquisition: { actual: 0, target: 0, totalTarget: 0 },
+    ad_spend: { actual: 0, target: 0, totalTarget: 0 },
+    leads: { actual: 0, target: 0, totalTarget: 0 }
   }
 
   const existingGroups = new Set<string>()
@@ -244,13 +244,15 @@ export function aggregateByMetricGroup(
         groupRawTotals[g].target += (sumCustomTarget > 0 ? sumCustomTarget : 
                                     manualDaily > 0 ? (manualDaily * daysInSelection) : 
                                     (monthlyTarget * prorationFactor))
+        
+        groupRawTotals[g].totalTarget += (sumCustomTarget > 0 ? sumCustomTarget : monthlyTarget)
       } else if (g === 'conversion' || g === 'efficiency') {
         existingGroups.add(g)
       }
     })
   })
 
-  const result: Record<string, { actual: number, target: number, isComputed: boolean }> = {}
+  const result: Record<string, { actual: number, target: number, totalTarget: number, isComputed: boolean }> = {}
 
   Object.keys(groupRawTotals).forEach(g => {
     if (existingGroups.has(g)) {
@@ -262,14 +264,14 @@ export function aggregateByMetricGroup(
     const acq = groupRawTotals['user_acquisition']?.actual || 0
     const lds = groupRawTotals['leads']?.actual || 0
     const actual = lds > 0 ? (acq / lds) * 100 : 0
-    result['conversion'] = { actual, target: 0, isComputed: true }
+    result['conversion'] = { actual, target: 0, totalTarget: 0, isComputed: true }
   }
 
   if (existingGroups.has('efficiency')) {
     const rev = groupRawTotals['revenue']?.actual || 0
     const spd = groupRawTotals['ad_spend']?.actual || 0
     const actual = spd > 0 ? (rev / spd) : 0
-    result['efficiency'] = { actual, target: 0, isComputed: true }
+    result['efficiency'] = { actual, target: 0, totalTarget: 0, isComputed: true }
   }
 
   return result

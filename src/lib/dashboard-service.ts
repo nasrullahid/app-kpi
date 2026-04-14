@@ -126,8 +126,18 @@ export async function getUnifiedDashboardData(options: {
 
   // 5. Milestone Completions
   const milestoneIds = programs.flatMap(p => p.program_milestones?.map(m => m.id) || [])
+  let milestoneCompletionsQuery = supabase.from('milestone_completions').select('*').in('milestone_id', milestoneIds)
+  
+  if (options.startDate && options.endDate) {
+    milestoneCompletionsQuery = milestoneCompletionsQuery
+      .gte('completed_at', options.startDate)
+      .lte('completed_at', options.endDate + 'T23:59:59')
+  } else {
+    milestoneCompletionsQuery = milestoneCompletionsQuery.eq('period_id', activePeriod.id)
+  }
+
   const { data: milestoneCompletions } = milestoneIds.length > 0
-    ? await supabase.from('milestone_completions').select('*').in('milestone_id', milestoneIds)
+    ? await milestoneCompletionsQuery
     : { data: [] }
 
   // 6. Proration Factor & Summary

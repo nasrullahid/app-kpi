@@ -29,6 +29,7 @@ export function DashboardDateFilter() {
       params.set('startDate', format(date.from, 'yyyy-MM-dd'))
       params.set('endDate', format(date.to, 'yyyy-MM-dd'))
       router.push(`${pathname}?${params.toString()}`)
+      router.refresh()
     }
   }
 
@@ -38,6 +39,7 @@ export function DashboardDateFilter() {
     params.delete('startDate')
     params.delete('endDate')
     router.push(`${pathname}?${params.toString()}`)
+    router.refresh()
   }
 
   return (

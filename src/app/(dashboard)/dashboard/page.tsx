@@ -69,6 +69,8 @@ export default async function DashboardPage({
             previousMetricValues={data.previousMetricValues}
             previousDailyInputs={data.previousDailyInputs}
             isCustomDateRange={data.isCustomDateRange}
+            startDate={searchParams.startDate}
+            endDate={searchParams.endDate}
           />
         </Suspense>
       )}

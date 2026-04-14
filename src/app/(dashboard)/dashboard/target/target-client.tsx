@@ -29,7 +29,8 @@ interface TargetClientProps {
   previousDailyInputs?: DailyInput[]
   previousSummary?: DashboardSummary
   isCustomDateRange?: boolean
-  prorationFactor?: number
+  startDate?: string
+  endDate?: string
 }
 
 function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }: {
@@ -74,20 +75,25 @@ export function TargetClient({
   milestoneCompletions,
   metricValues,
   isCustomDateRange,
-  prorationFactor = 1,
   summary: dashboardSummary,
-  previousSummary
+  previousSummary,
+  startDate,
+  endDate
 }: TargetClientProps) {
   // ── Collect primary revenue + user metrics from all programs ────────────
   const summary = useMemo(() => {
     const agg = dashboardSummary.aggregates
     const prevAgg = previousSummary?.aggregates
 
-    const totalTargetRp = agg.revenue?.target || 0
+    // totalTarget is the full monthly goal (absolute)
+    // target is the prorated goal (relative to selection)
+    const monthlyTargetRp = agg.revenue?.totalTarget || 0
+    const proRataRp = agg.revenue?.target || 0
     const totalAchievedRp = agg.revenue?.actual || 0
     const prevAchievedRp = prevAgg?.revenue?.actual || 0
 
-    const totalTargetUser = agg.user_acquisition?.target || 0
+    const monthlyTargetUser = agg.user_acquisition?.totalTarget || 0
+    const proRataUser = agg.user_acquisition?.target || 0
     const totalAchievedUser = agg.user_acquisition?.actual || 0
     const prevAchievedUser = prevAgg?.user_acquisition?.actual || 0
 
@@ -99,28 +105,43 @@ export function TargetClient({
       completedMilestones += milestoneCompletions.filter(c => msIds.includes(c.milestone_id) && c.is_completed).length
     })
 
-    // Current ideal targets (respecting manual targets via proration)
-    const proRataRp = totalTargetRp * prorationFactor
-    const proRataUser = totalTargetUser * prorationFactor
-
     return {
-      totalTargetRp, totalAchievedRp,
-      totalTargetUser, totalAchievedUser,
+      totalTargetRp: monthlyTargetRp, 
+      totalAchievedRp,
+      totalTargetUser: monthlyTargetUser, 
+      totalAchievedUser,
       totalMilestones, completedMilestones,
-      rpPct: totalTargetRp > 0 ? (totalAchievedRp / totalTargetRp) * 100 : 0,
-      userPct: totalTargetUser > 0 ? (totalAchievedUser / totalTargetUser) * 100 : 0,
+      rpPct: monthlyTargetRp > 0 ? (totalAchievedRp / monthlyTargetRp) * 100 : 0,
+      userPct: monthlyTargetUser > 0 ? (totalAchievedUser / monthlyTargetUser) * 100 : 0,
       proRataRp,
       proRataUser,
       rpGrowth: prevAchievedRp > 0 ? ((totalAchievedRp - prevAchievedRp) / prevAchievedRp) * 100 : 0,
       userGrowth: prevAchievedUser > 0 ? ((totalAchievedUser - prevAchievedUser) / prevAchievedUser) * 100 : 0,
       hasPrevData: prevAchievedRp > 0 || prevAchievedUser > 0,
     }
-  }, [dashboardSummary, previousSummary, programs, milestoneCompletions, prorationFactor])
+  }, [dashboardSummary, previousSummary, programs, milestoneCompletions])
 
   // ── Revenue cumulative trend ─────────────────────────────────────────────
   const rpTrend = useMemo(() => {
-    const today = new Date().getDate()
     const daysInMonth = activePeriod.working_days || 30
+    
+    // Determine the range of dates to show in the chart
+    const dateRange: string[] = []
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const current = new Date(start)
+      while (current <= end) {
+        dateRange.push(current.toISOString().split('T')[0])
+        current.setDate(current.getDate() + 1)
+      }
+    } else {
+      const today = new Date().getDate()
+      for (let i = 1; i <= Math.min(today, 30); i++) {
+        dateRange.push(`${activePeriod.year}-${String(activePeriod.month).padStart(2, '0')}-${String(i).padStart(2, '0')}`)
+      }
+    }
+
     let cumulative = 0
     let cumulativeTarget = 0
 
@@ -148,19 +169,22 @@ export function TargetClient({
       }
     })
 
-    return Array.from({ length: Math.min(today, 30) }, (_, i) => {
-      const day = i + 1
-      const dateStr = `${activePeriod.year}-${String(activePeriod.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      cumulative += rpByDate.get(dateStr) || 0
+    return dateRange.map((dateStr, i) => {
+      const achieved = rpByDate.get(dateStr) || 0
+      cumulative += achieved
       cumulativeTarget += totalDailyTarget
-      
+
+      const displayLabel = startDate && endDate 
+        ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(dateStr))
+        : String(i + 1)
+
       return {
-        day: String(day),
+        day: displayLabel,
         realisasi: cumulative,
         targetIdeal: cumulativeTarget
       }
     })
-  }, [activePeriod, programs, metricValues, dailyInputs])
+  }, [activePeriod, programs, metricValues, dailyInputs, startDate, endDate])
 
   // ── Bar chart: Rp per program ────────────────────────────────────────────
   const rpBarData = useMemo(() => {
@@ -303,7 +327,7 @@ export function TargetClient({
                   formatter={(v: unknown) => [formatRupiah(Number(v || 0)), '']}
                   labelFormatter={(l: unknown) => `Hari ke-${l}`}
                 />
-                <ReferenceLine y={summary.totalTargetRp} stroke="#ef4444" strokeDasharray="4 4" opacity={0.5} label={{ value: 'TARGET', position: 'right', fill: '#ef4444', fontSize: 10 }} />
+                <ReferenceLine y={summary.proRataRp} stroke="#ef4444" strokeDasharray="4 4" opacity={0.5} label={{ value: 'IDEAL', position: 'right', fill: '#ef4444', fontSize: 10 }} />
                 <Line type="monotone" dataKey="targetIdeal" stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
                 <Line type="monotone" dataKey="realisasi" stroke="#6366f1" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
@@ -319,7 +343,7 @@ export function TargetClient({
               <BarChart data={rpBarData} layout="vertical" margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tickFormatter={(v: number) => v >= 1e6 ? `${(v/1e6).toFixed(0)}jt` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.length > 14 ? v.substring(0, 14) + '...' : v} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.length > 20 ? v.substring(0, 20) + '...' : v} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
                   formatter={(v: unknown) => [formatRupiah(Number(v || 0)), '']}

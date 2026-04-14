@@ -35,6 +35,8 @@ interface OverviewClientProps {
   previousDailyInputs?: DailyInput[]
   previousSummary?: DashboardSummary
   isCustomDateRange?: boolean
+  startDate?: string
+  endDate?: string
 }
 
 // ── Status helpers ───────────────────────────────────────────────────────────
@@ -256,7 +258,9 @@ export function OverviewClient({
   profiles,
   summary,
   previousSummary,
-  isCustomDateRange
+  isCustomDateRange,
+  startDate,
+  endDate
 }: OverviewClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDept, setFilterDept] = useState('all')
@@ -309,20 +313,48 @@ export function OverviewClient({
 
   // ── Health Trend chart (global health per day) ────────────────────────────
   const trendData = useMemo(() => {
-    const today = new Date().getDate()
-    return Array.from({ length: Math.min(today, 30) }, (_, i) => {
+    // Determine the range of dates to show in the chart
+    const dateRange: string[] = []
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const current = new Date(start)
+      while (current <= end) {
+        dateRange.push(current.toISOString().split('T')[0])
+        current.setDate(current.getDate() + 1)
+      }
+    } else {
+      const today = new Date().getDate()
+      for (let i = 1; i <= Math.min(today, 30); i++) {
+        dateRange.push(`${activePeriod.year}-${String(activePeriod.month).padStart(2, '0')}-${String(i).padStart(2, '0')}`)
+      }
+    }
+
+    return dateRange.map((dateStr, i) => {
       const day = i + 1
-      const dateStr = `${activePeriod.year}-${String(activePeriod.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       const subInputs = dailyInputs.filter(inp => inp.date <= dateStr)
       const subMetrics = metricValues.filter(mv => mv.date <= dateStr)
-      const dayFactor = day / (activePeriod.working_days || 30)
+      
+      // Calculate active factor based on selection vs full period
+      const totalDays = activePeriod.working_days || 30
+      // For trend purposes, we still use the cumulative factor up to that point
+      // If in custom mode, we should ideally use the selection's context, 
+      // but for "Health Score" trend it usually means "How was the health ON that day"
+      const dayFactor = (i + 1) / totalDays 
+
       const dayHealths = programs.map(p =>
-        calculateProgramHealth(p as CalcProgramWithRelations, subMetrics, subInputs, milestoneCompletions, dayFactor, activePeriod.working_days || 0)
+        calculateProgramHealth(p as CalcProgramWithRelations, subMetrics, subInputs, milestoneCompletions, dayFactor, totalDays)
       )
       const avg = dayHealths.length > 0 ? dayHealths.reduce((s, h) => s + h.healthScore, 0) / dayHealths.length : 0
-      return { day: String(day), health: Math.min(Math.round(avg), 150) }
+      
+      const displayLabel = startDate && endDate 
+        ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(dateStr))
+        : String(day)
+
+      return { day: displayLabel, health: Math.min(Math.round(avg), 150) }
     })
-  }, [activePeriod, programs, dailyInputs, metricValues, milestoneCompletions])
+  }, [activePeriod, programs, dailyInputs, metricValues, milestoneCompletions, startDate, endDate])
 
   // ── Bar chart: % health per program ─────────────────────────────────────
   const barData = useMemo(() =>

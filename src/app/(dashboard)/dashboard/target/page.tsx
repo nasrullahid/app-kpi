@@ -60,7 +60,8 @@ export default async function TargetPage({
             previousMetricValues={data.previousMetricValues}
             previousDailyInputs={data.previousDailyInputs}
             isCustomDateRange={data.isCustomDateRange}
-            prorationFactor={data.prorationFactor}
+            startDate={searchParams.startDate}
+            endDate={searchParams.endDate}
           />
         </Suspense>
       )}
