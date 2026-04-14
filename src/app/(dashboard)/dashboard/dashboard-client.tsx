@@ -329,7 +329,7 @@ export function OverviewClient({
     [...programHealths]
       .sort((a, b) => b.healthScore - a.healthScore)
       .map(ph => ({
-        name: ph.program.name.length > 14 ? ph.program.name.substring(0, 14) + '…' : ph.program.name,
+        name: ph.program.name,
         healthScore: Math.min(Math.round(ph.healthScore), 150),
       })),
     [programHealths]
@@ -488,7 +488,7 @@ export function OverviewClient({
               <BarChart data={barData} margin={{ top: 5, right: 10, left: -20, bottom: 20 }} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" domain={[0, 120]} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} width={90} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} width={90} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.length > 14 ? v.substring(0, 14) + '...' : v} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
                   formatter={(v) => [`${Number(v)}%`, 'Health Score']}

@@ -172,13 +172,13 @@ export function TargetClient({
           const vals = metricValues.filter(mv => mv.metric_definition_id === revDef.id && mv.program_id === prog.id)
           const achieved = vals.reduce((s, v) => s + Number(v.value || 0), 0)
           const target = revDef.monthly_target || 0
-          return { name: prog.name.substring(0, 14), achieved, target, pct: target > 0 ? (achieved / target) * 100 : 0 }
+          return { name: prog.name, achieved, target, pct: target > 0 ? (achieved / target) * 100 : 0 }
         }
         // Legacy
         const inputs = dailyInputs.filter(i => i.program_id === prog.id)
-        const achieved = inputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
-        const target = prog.monthly_target_rp || 0
-        return { name: prog.name.substring(0, 14), achieved, target, pct: target > 0 ? (achieved / target) * 100 : 0 }
+        const achievedCurrent = inputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
+        const targetCurrent = prog.monthly_target_rp || 0
+        return { name: prog.name, achieved: achievedCurrent, target: targetCurrent, pct: targetCurrent > 0 ? (achievedCurrent / targetCurrent) * 100 : 0 }
       })
       .filter(d => d.target > 0)
       .sort((a, b) => b.pct - a.pct)
@@ -319,7 +319,7 @@ export function TargetClient({
               <BarChart data={rpBarData} layout="vertical" margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tickFormatter={(v: number) => v >= 1e6 ? `${(v/1e6).toFixed(0)}jt` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.length > 14 ? v.substring(0, 14) + '...' : v} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
                   formatter={(v: unknown) => [formatRupiah(Number(v || 0)), '']}

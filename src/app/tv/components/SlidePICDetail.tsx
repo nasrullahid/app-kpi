@@ -143,6 +143,7 @@ export function SlidePICDetail({ pic, programs }: SlidePICDetailProps) {
                        tickLine={false} 
                        width={180}
                        tick={{ fill: '#f1f5f9', fontSize: 14, fontWeight: 900 }}
+                       tickFormatter={(v: string) => v.length > 20 ? v.substring(0, 20) + '...' : v}
                     />
                     <Tooltip 
                        cursor={{ fill: '#1e293b', opacity: 0.4 }}
