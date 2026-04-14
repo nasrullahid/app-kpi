@@ -20,6 +20,8 @@ type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
 type Period = Database['public']['Tables']['periods']['Row']
 
+import { DashboardSummary } from '@/lib/dashboard-service'
+
 interface OverviewClientProps {
   programs: ProgramWithRelations[]
   dailyInputs: DailyInput[]
@@ -28,8 +30,10 @@ interface OverviewClientProps {
   metricValues: MetricValue[]
   profiles: { id: string; name: string }[]
   prorationFactor: number
+  summary: DashboardSummary
   previousMetricValues?: MetricValue[]
   previousDailyInputs?: DailyInput[]
+  previousSummary?: DashboardSummary
   isCustomDateRange?: boolean
 }
 
@@ -251,8 +255,8 @@ export function OverviewClient({
   metricValues,
   profiles,
   prorationFactor,
-  previousMetricValues = [],
-  previousDailyInputs = [],
+  summary,
+  previousSummary,
   isCustomDateRange
 }: OverviewClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -260,41 +264,11 @@ export function OverviewClient({
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy, setSortBy] = useState<'health' | 'name'>('health')
 
-  // ── Computed stats ───────────────────────────────────────────────────────
-  const programHealths = useMemo(() =>
-    programs.map(p => ({
-      program: p,
-      health: calculateProgramHealth(
-        p as CalcProgramWithRelations,
-        metricValues,
-        dailyInputs,
-        milestoneCompletions,
-        prorationFactor,
-        activePeriod.working_days || 0
-      )
-    })),
-    [programs, metricValues, dailyInputs, milestoneCompletions, prorationFactor]
-  )
+  // ── Computed stats (from shared summary) ───────────────────────────────────────────────────────
+  const programHealths = summary.programHealths
+  const overallHealth = summary.overallHealth
 
-  const overallHealth = useMemo(() => {
-    if (programHealths.length === 0) return 0
-    return programHealths.reduce((sum, ph) => sum + ph.health.healthScore, 0) / programHealths.length
-  }, [programHealths])
-
-  const prevOverallHealth = useMemo(() => {
-    if (!isCustomDateRange || programs.length === 0) return null
-    const prevHealths = programs.map(p => 
-      calculateProgramHealth(
-        p as CalcProgramWithRelations,
-        previousMetricValues,
-        previousDailyInputs,
-        milestoneCompletions,
-        prorationFactor,
-        activePeriod.working_days || 0
-      )
-    )
-    return prevHealths.reduce((sum, ph) => sum + ph.healthScore, 0) / prevHealths.length
-  }, [programs, previousMetricValues, previousDailyInputs, milestoneCompletions, prorationFactor, isCustomDateRange])
+  const prevOverallHealth = previousSummary?.overallHealth || null
 
   const healthGrowth = prevOverallHealth !== null && prevOverallHealth > 0 
     ? ((overallHealth - prevOverallHealth) / prevOverallHealth) * 100 
@@ -305,22 +279,9 @@ export function OverviewClient({
     const ids = p.program_milestones?.map(m => m.id) || []
     return sum + milestoneCompletions.filter(c => ids.includes(c.milestone_id) && c.is_completed).length
   }, 0)
-  const targetTercapai = programHealths.filter(ph => ph.health.healthScore >= 100).length
-
-  const prevTargetTercapai = useMemo(() => {
-    if (!isCustomDateRange || programs.length === 0) return null
-    const prevHealths = programs.map(p => 
-      calculateProgramHealth(
-        p as CalcProgramWithRelations,
-        previousMetricValues,
-        previousDailyInputs,
-        milestoneCompletions,
-        prorationFactor,
-        activePeriod.working_days || 0
-      )
-    )
-    return prevHealths.filter(h => h.healthScore >= 100).length
-  }, [programs, previousMetricValues, previousDailyInputs, milestoneCompletions, prorationFactor, isCustomDateRange])
+  
+  const targetTercapai = summary.statusCounts.tercapai
+  const prevTargetTercapai = previousSummary?.statusCounts.tercapai || null
 
   const targetGrowth = (prevTargetTercapai !== null && prevTargetTercapai > 0)
     ? ((targetTercapai - prevTargetTercapai) / prevTargetTercapai) * 100
@@ -333,21 +294,19 @@ export function OverviewClient({
   }, [programs])
 
   // ── Filtered + sorted programs ───────────────────────────────────────────
-  const filteredPrograms = useMemo(() => {
-    return programHealths
-      .filter(({ program, health }) => {
-        const q = searchQuery.toLowerCase()
-        const matchSearch = !q || program.name.toLowerCase().includes(q)
-        const matchDept = filterDept === 'all' || program.department === filterDept
-        const status = getStatusLabelAndColor(health.healthScore).label.toLowerCase()
-        const matchStatus = filterStatus === 'all' || status.includes(filterStatus)
-        return matchSearch && matchDept && matchStatus
-      })
-      .sort((a, b) => {
-        if (sortBy === 'name') return a.program.name.localeCompare(b.program.name)
-        return b.health.healthScore - a.health.healthScore
-      })
-  }, [programHealths, searchQuery, filterDept, filterStatus, sortBy])
+  const filteredPrograms = useMemo(() =>
+    programHealths.filter(ph => {
+      const matchesSearch = ph.program.name.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesDept = filterDept === 'all' || ph.program.department === filterDept
+      if (filterStatus === 'all') return matchesSearch && matchesDept
+      const statusKey = ph.status.toLowerCase().replace(' ', '_')
+      return statusKey === filterStatus && matchesSearch && matchesDept
+    }).sort((a, b) => {
+      if (sortBy === 'health') return b.healthScore - a.healthScore
+      return a.program.name.localeCompare(b.program.name)
+    }),
+    [programHealths, searchQuery, filterDept, filterStatus, sortBy]
+  )
 
   // ── Health Trend chart (global health per day) ────────────────────────────
   const trendData = useMemo(() => {
@@ -369,10 +328,10 @@ export function OverviewClient({
   // ── Bar chart: % health per program ─────────────────────────────────────
   const barData = useMemo(() =>
     [...programHealths]
-      .sort((a, b) => b.health.healthScore - a.health.healthScore)
+      .sort((a, b) => b.healthScore - a.healthScore)
       .map(ph => ({
         name: ph.program.name.length > 14 ? ph.program.name.substring(0, 14) + '…' : ph.program.name,
-        health: Math.min(Math.round(ph.health.healthScore), 150),
+        healthScore: Math.min(Math.round(ph.healthScore), 150),
       })),
     [programHealths]
   )
@@ -481,11 +440,11 @@ export function OverviewClient({
         </div>
         {filteredPrograms.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredPrograms.map(({ program, health }) => (
+            {filteredPrograms.map((ph) => (
               <ProgramCard
-                key={program.id}
-                program={program}
-                health={health}
+                key={ph.program.id}
+                program={ph.program}
+                health={ph}
                 metricValues={metricValues}
                 milestoneCompletions={milestoneCompletions}
                 profiles={profiles}
@@ -535,9 +494,9 @@ export function OverviewClient({
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
                   formatter={(v) => [`${Number(v)}%`, 'Health Score']}
                 />
-                <Bar dataKey="health" radius={[0, 6, 6, 0]} maxBarSize={16}>
+                <Bar dataKey="healthScore" radius={[0, 6, 6, 0]} maxBarSize={16}>
                   {barData.map((entry, idx) => (
-                    <Cell key={idx} fill={entry.health >= 100 ? '#10b981' : entry.health >= 60 ? '#6366f1' : '#f59e0b'} />
+                    <Cell key={idx} fill={entry.healthScore >= 100 ? '#10b981' : entry.healthScore >= 60 ? '#6366f1' : '#f59e0b'} />
                   ))}
                 </Bar>
               </BarChart>

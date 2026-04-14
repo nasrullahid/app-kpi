@@ -9,10 +9,15 @@ import {
 } from 'recharts'
 import { TrendingUp, Users, Target, CheckSquare } from 'lucide-react'
 
+import { Database } from '@/types/database'
+import { ProgramWithRelations } from '../actions'
+
 type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
 type Period = Database['public']['Tables']['periods']['Row']
+
+import { DashboardSummary } from '@/lib/dashboard-service'
 
 interface TargetClientProps {
   programs: ProgramWithRelations[]
@@ -20,9 +25,12 @@ interface TargetClientProps {
   activePeriod: Period
   milestoneCompletions: MilestoneCompletion[]
   metricValues: MetricValue[]
+  summary: DashboardSummary
   previousMetricValues?: MetricValue[]
   previousDailyInputs?: DailyInput[]
+  previousSummary?: DashboardSummary
   isCustomDateRange?: boolean
+  prorationFactor?: number
 }
 
 function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }: {
@@ -69,13 +77,14 @@ export function TargetClient({
   previousMetricValues = [],
   previousDailyInputs = [],
   isCustomDateRange,
-  prorationFactor = 1
+  prorationFactor = 1,
+  summary: dashboardSummary,
+  previousSummary
 }: TargetClientProps) {
   // ── Collect primary revenue + user metrics from all programs ────────────
   const summary = useMemo(() => {
-    const workingDays = activePeriod.working_days || 30
-    const agg = aggregateByMetricGroup(programs as CalcProgramWithRelations[], metricValues, prorationFactor, workingDays)
-    const prevAgg = isCustomDateRange ? aggregateByMetricGroup(programs as CalcProgramWithRelations[], previousMetricValues, prorationFactor, workingDays) : null
+    const agg = dashboardSummary.aggregates
+    const prevAgg = previousSummary?.aggregates
 
     const totalTargetRp = agg.revenue?.target || 0
     const totalAchievedRp = agg.revenue?.actual || 0
@@ -93,18 +102,9 @@ export function TargetClient({
       completedMilestones += milestoneCompletions.filter(c => msIds.includes(c.milestone_id) && c.is_completed).length
     })
 
-    // Pro-rata calculations need to respect manual daily targets
-    let proRataRp = 0
-    let proRataUser = 0
-    
-    programs.forEach(prog => {
-      const dayCount = isCustomDateRange ? (prorationFactor * workingDays) : new Date().getDate()
-      const dailyRp = prog.daily_target_rp !== null ? Number(prog.daily_target_rp) : (Number(prog.monthly_target_rp || 0) / workingDays)
-      const dailyUser = prog.daily_target_user !== null ? Number(prog.daily_target_user) : (Number(prog.monthly_target_user || 0) / workingDays)
-      
-      proRataRp += dailyRp * dayCount
-      proRataUser += dailyUser * dayCount
-    })
+    // Current ideal targets (respecting manual targets via proration)
+    const proRataRp = totalTargetRp * prorationFactor
+    const proRataUser = totalTargetUser * prorationFactor
 
     return {
       totalTargetRp, totalAchievedRp,
@@ -118,7 +118,7 @@ export function TargetClient({
       userGrowth: prevAchievedUser > 0 ? ((totalAchievedUser - prevAchievedUser) / prevAchievedUser) * 100 : 0,
       hasPrevData: prevAchievedRp > 0 || prevAchievedUser > 0,
     }
-  }, [programs, metricValues, dailyInputs, previousMetricValues, previousDailyInputs, milestoneCompletions, activePeriod, isCustomDateRange, prorationFactor])
+  }, [dashboardSummary, previousSummary, programs, milestoneCompletions, prorationFactor])
 
   // ── Revenue cumulative trend ─────────────────────────────────────────────
   const rpTrend = useMemo(() => {
