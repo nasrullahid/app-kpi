@@ -28,6 +28,9 @@ interface OverviewClientProps {
   metricValues: MetricValue[]
   profiles: { id: string; name: string }[]
   prorationFactor: number
+  previousMetricValues?: MetricValue[]
+  previousDailyInputs?: DailyInput[]
+  isCustomDateRange?: boolean
 }
 
 // ── Status helpers ───────────────────────────────────────────────────────────
@@ -56,23 +59,38 @@ function getBannerInfo(score: number) {
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ icon: Icon, label, value, sub, iconClass }: {
+function KpiCard({ icon: Icon, label, value, sub, iconClass, comparison }: {
   icon: React.ElementType
   label: string
   value: string | number
   sub?: string
   iconClass?: string
+  comparison?: { value: number; label: string }
 }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all hover:shadow-md">
       <div className="absolute top-0 right-0 p-4 opacity-5">
         <Icon className="w-20 h-20" />
       </div>
-      <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3">{label}</p>
-      <div className="flex items-end gap-2">
-        <span className={cn("text-4xl font-black text-slate-800", iconClass)}>{value}</span>
-        {sub && <span className="text-sm text-slate-400 font-semibold mb-1">{sub}</span>}
+      <div>
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3">{label}</p>
+        <div className="flex items-end gap-2">
+          <span className={cn("text-4xl font-black text-slate-800", iconClass)}>{value}</span>
+          {sub && <span className="text-sm text-slate-400 font-semibold mb-1">{sub}</span>}
+        </div>
       </div>
+      {comparison && (
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+          <span className={cn(
+            "text-xs font-bold px-1.5 py-0.5 rounded",
+            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+          )}>
+            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
+          </span>
+          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -233,6 +251,9 @@ export function OverviewClient({
   metricValues,
   profiles,
   prorationFactor,
+  previousMetricValues = [],
+  previousDailyInputs = [],
+  isCustomDateRange
 }: OverviewClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDept, setFilterDept] = useState('all')
@@ -259,12 +280,48 @@ export function OverviewClient({
     return programHealths.reduce((sum, ph) => sum + ph.health.healthScore, 0) / programHealths.length
   }, [programHealths])
 
+  const prevOverallHealth = useMemo(() => {
+    if (!isCustomDateRange || programs.length === 0) return null
+    const prevHealths = programs.map(p => 
+      calculateProgramHealth(
+        p as CalcProgramWithRelations,
+        previousMetricValues,
+        previousDailyInputs,
+        milestoneCompletions,
+        prorationFactor
+      )
+    )
+    return prevHealths.reduce((sum, ph) => sum + ph.healthScore, 0) / prevHealths.length
+  }, [programs, previousMetricValues, previousDailyInputs, milestoneCompletions, prorationFactor, isCustomDateRange])
+
+  const healthGrowth = prevOverallHealth !== null && prevOverallHealth > 0 
+    ? ((overallHealth - prevOverallHealth) / prevOverallHealth) * 100 
+    : 0
+
   const totalMilestones = programs.reduce((sum, p) => sum + (p.program_milestones?.length || 0), 0)
   const completedMilestones = programs.reduce((sum, p) => {
     const ids = p.program_milestones?.map(m => m.id) || []
     return sum + milestoneCompletions.filter(c => ids.includes(c.milestone_id) && c.is_completed).length
   }, 0)
   const targetTercapai = programHealths.filter(ph => ph.health.healthScore >= 100).length
+
+  const prevTargetTercapai = useMemo(() => {
+    if (!isCustomDateRange || programs.length === 0) return null
+    const prevHealths = programs.map(p => 
+      calculateProgramHealth(
+        p as CalcProgramWithRelations,
+        previousMetricValues,
+        previousDailyInputs,
+        milestoneCompletions,
+        prorationFactor
+      )
+    )
+    return prevHealths.filter(h => h.healthScore >= 100).length
+  }, [programs, previousMetricValues, previousDailyInputs, milestoneCompletions, prorationFactor, isCustomDateRange])
+
+  const targetGrowth = (prevTargetTercapai !== null && prevTargetTercapai > 0)
+    ? ((targetTercapai - prevTargetTercapai) / prevTargetTercapai) * 100
+    : (prevTargetTercapai === 0 && targetTercapai > 0) ? 100 : 0
 
   // ── Departments list ─────────────────────────────────────────────────────
   const departments = useMemo(() => {
@@ -331,14 +388,32 @@ export function OverviewClient({
           <div className="flex items-end gap-2">
             <span className="text-4xl font-black text-slate-800">{overallHealth.toFixed(1)}%</span>
           </div>
-          <span className={cn("inline-flex items-center gap-1.5 mt-2 text-xs font-bold px-2.5 py-1 rounded-full border", badge)}>
-            <span className={cn("h-2 w-2 rounded-full", dot)} />
-            {statusLabel}
-          </span>
+          <div className="flex items-center gap-2 mt-2">
+            <span className={cn("inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border", badge)}>
+              <span className={cn("h-2 w-2 rounded-full", dot)} />
+              {statusLabel}
+            </span>
+            {isCustomDateRange && prevOverallHealth !== null && (
+               <span className={cn(
+                "text-xs font-bold px-1.5 py-0.5 rounded",
+                healthGrowth > 0 ? "bg-emerald-100 text-emerald-700" : 
+                healthGrowth < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+              )}>
+                {healthGrowth > 0 ? '+' : ''}{healthGrowth.toFixed(1)}% vs prev
+              </span>
+            )}
+          </div>
         </div>
 
         <KpiCard icon={Layers} label="Program Aktif" value={programs.length} sub={`${departments.length} dept`} />
-        <KpiCard icon={Target} label="Target Tercapai" value={targetTercapai} sub={`/ ${programs.length} prog`} iconClass="text-emerald-600" />
+        <KpiCard 
+          icon={Target} 
+          label="Target Tercapai" 
+          value={targetTercapai} 
+          sub={`/ ${programs.length} prog`} 
+          iconClass="text-emerald-600" 
+          comparison={isCustomDateRange && prevTargetTercapai !== null ? { value: targetGrowth, label: 'vs periode sblmnya' } : undefined}
+        />
         <KpiCard icon={CheckSquare} label="Milestone Done" value={completedMilestones} sub={`/ ${totalMilestones} tugas`} iconClass="text-indigo-600" />
       </div>
 

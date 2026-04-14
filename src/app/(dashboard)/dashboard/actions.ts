@@ -26,6 +26,9 @@ export interface DashboardData {
   isAdmin: boolean
   userName: string
   prorationFactor: number
+  previousDailyInputs?: DailyInput[]
+  previousMetricValues?: MetricValue[]
+  isCustomDateRange?: boolean
 }
 
 /**
@@ -96,8 +99,30 @@ export async function getDashboardData(
     ? await supabase.from('milestone_completions').select('*').in('milestone_id', milestoneIds)
     : { data: [] }
 
+  // Calculate previous period dates if filters are active
+  let prevStartStr = ''
+  let prevEndStr = ''
+  let daysInSelection = 30
+
+  if (startDate && endDate) {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    daysInSelection = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    
+    const prevEnd = new Date(start)
+    prevEnd.setDate(prevEnd.getDate() - 1)
+    const prevStart = new Date(prevEnd)
+    prevStart.setDate(prevStart.getDate() - daysInSelection + 1)
+    
+    prevStartStr = prevStart.toISOString().split('T')[0]
+    prevEndStr = prevEnd.toISOString().split('T')[0]
+  }
+
   // Daily Inputs
   let dailyInputs: DailyInput[] = []
+  let previousDailyInputs: DailyInput[] = []
+
   if (programIds.length > 0) {
     let q = supabase.from('daily_inputs').select('*').in('program_id', programIds)
     if (startDate && endDate) {
@@ -107,10 +132,22 @@ export async function getDashboardData(
     }
     const { data } = await q.order('date', { ascending: true })
     dailyInputs = data || []
+
+    if (startDate && endDate) {
+      const { data: prevData } = await supabase
+        .from('daily_inputs')
+        .select('*')
+        .in('program_id', programIds)
+        .gte('date', prevStartStr)
+        .lte('date', prevEndStr)
+      previousDailyInputs = prevData || []
+    }
   }
 
   // Metric Values
   let metricValues: MetricValue[] = []
+  let previousMetricValues: MetricValue[] = []
+  
   if (programIds.length > 0) {
     let q = supabase
       .from('daily_metric_values')
@@ -124,6 +161,16 @@ export async function getDashboardData(
     }
     const { data } = await q
     metricValues = data || []
+
+    if (startDate && endDate) {
+      const { data: prevData } = await supabase
+        .from('daily_metric_values')
+        .select('*')
+        .in('program_id', programIds)
+        .gte('date', prevStartStr)
+        .lte('date', prevEndStr)
+      previousMetricValues = prevData || []
+    }
   }
 
   // All profiles (for PIC names)
@@ -134,10 +181,6 @@ export async function getDashboardData(
   let prorationFactor = 1
 
   if (startDate && endDate) {
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    const diffTime = Math.abs(end.getTime() - start.getTime())
-    const daysInSelection = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
     prorationFactor = daysInSelection / totalDays
   } else {
     const today = new Date().getDate()
@@ -147,12 +190,16 @@ export async function getDashboardData(
   return {
     programs: safePrograms,
     dailyInputs,
+    previousDailyInputs,
     milestoneCompletions: milestoneCompletions || [],
     metricValues,
+    previousMetricValues,
     activePeriod,
     profiles: profiles || [],
     isAdmin,
     userName: profile?.name || user.email || '',
     prorationFactor,
+    isCustomDateRange: !!(startDate && endDate)
   }
 }
+

@@ -64,6 +64,9 @@ export default async function DashboardPage({
             metricValues={data.metricValues}
             profiles={data.profiles}
             prorationFactor={data.prorationFactor}
+            previousMetricValues={data.previousMetricValues}
+            previousDailyInputs={data.previousDailyInputs}
+            isCustomDateRange={data.isCustomDateRange}
           />
         </Suspense>
       )}

@@ -21,24 +21,42 @@ interface TargetClientProps {
   activePeriod: Period
   milestoneCompletions: MilestoneCompletion[]
   metricValues: MetricValue[]
+  previousMetricValues?: MetricValue[]
+  previousDailyInputs?: DailyInput[]
+  isCustomDateRange?: boolean
 }
 
-function KpiCard({ label, value, sub, subColor, icon: Icon, accent }: {
+function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }: {
   label: string
   value: string
   sub?: string
   subColor?: string
   icon: React.ElementType
   accent: string
+  comparison?: { value: number; label: string }
 }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
       <div className={cn("absolute top-0 right-0 p-4 opacity-5", accent)}>
         <Icon className="w-20 h-20" />
       </div>
-      <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
-      <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
-      {sub && <p className={cn("text-xs font-bold", subColor || 'text-slate-400')}>{sub}</p>}
+      <div>
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
+        <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
+        {sub && <p className={cn("text-xs font-bold mb-2", subColor || 'text-slate-400')}>{sub}</p>}
+      </div>
+      {comparison && (
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+          <span className={cn(
+            "text-xs font-bold px-1.5 py-0.5 rounded",
+            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+          )}>
+            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
+          </span>
+          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -49,11 +67,14 @@ export function TargetClient({
   activePeriod,
   milestoneCompletions,
   metricValues,
+  previousMetricValues = [],
+  previousDailyInputs = [],
+  isCustomDateRange
 }: TargetClientProps) {
   // ── Collect primary revenue + user metrics from all programs ────────────
   const summary = useMemo(() => {
-    let totalTargetRp = 0, totalAchievedRp = 0
-    let totalTargetUser = 0, totalAchievedUser = 0
+    let totalTargetRp = 0, totalAchievedRp = 0, prevAchievedRp = 0
+    let totalTargetUser = 0, totalAchievedUser = 0, prevAchievedUser = 0
     let totalMilestones = 0, completedMilestones = 0
 
     programs.forEach(prog => {
@@ -65,22 +86,38 @@ export function TargetClient({
         primaryDefs.forEach(m => {
           const vals = metricValues.filter(mv => mv.metric_definition_id === m.id && mv.program_id === prog.id)
           const achieved = vals.reduce((s, v) => s + Number(v.value || 0), 0)
+          
+          let prevAchieved = 0
+          if (isCustomDateRange) {
+            const pVals = previousMetricValues.filter(mv => mv.metric_definition_id === m.id && mv.program_id === prog.id)
+            prevAchieved = pVals.reduce((s, v) => s + Number(v.value || 0), 0)
+          }
+
           const target = m.monthly_target || 0
           if (m.data_type === 'currency') {
             totalTargetRp += target
             totalAchievedRp += achieved
+            prevAchievedRp += prevAchieved
           } else if (m.data_type === 'integer' || m.data_type === 'float') {
             totalTargetUser += target
             totalAchievedUser += achieved
+            prevAchievedUser += prevAchieved
           }
         })
       } else {
         // Legacy
         totalTargetRp += prog.monthly_target_rp || 0
         totalTargetUser += prog.monthly_target_user || 0
+        
         const inputs = dailyInputs.filter(i => i.program_id === prog.id)
         totalAchievedRp += inputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
         totalAchievedUser += inputs.reduce((s, i) => s + Number(i.achievement_user || 0), 0)
+
+        if (isCustomDateRange) {
+          const pInputs = previousDailyInputs.filter(i => i.program_id === prog.id)
+          prevAchievedRp += pInputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
+          prevAchievedUser += pInputs.reduce((s, i) => s + Number(i.achievement_user || 0), 0)
+        }
       }
 
       // Milestones
@@ -101,8 +138,11 @@ export function TargetClient({
       userPct: totalTargetUser > 0 ? (totalAchievedUser / totalTargetUser) * 100 : 0,
       proRataRp: totalTargetRp * pctDay,
       proRataUser: totalTargetUser * pctDay,
+      rpGrowth: prevAchievedRp > 0 ? ((totalAchievedRp - prevAchievedRp) / prevAchievedRp) * 100 : 0,
+      userGrowth: prevAchievedUser > 0 ? ((totalAchievedUser - prevAchievedUser) / prevAchievedUser) * 100 : 0,
+      hasPrevData: prevAchievedRp > 0 || prevAchievedUser > 0,
     }
-  }, [programs, metricValues, dailyInputs, milestoneCompletions, activePeriod])
+  }, [programs, metricValues, dailyInputs, previousMetricValues, previousDailyInputs, milestoneCompletions, activePeriod, isCustomDateRange])
 
   // ── Revenue cumulative trend ─────────────────────────────────────────────
   const rpTrend = useMemo(() => {
@@ -184,6 +224,7 @@ export function TargetClient({
           value={formatRupiah(summary.totalAchievedRp)}
           sub={`${summary.rpPct.toFixed(1)}% dari target`}
           subColor={summary.rpPct >= 100 ? 'text-emerald-600 font-black' : summary.rpPct >= 60 ? 'text-amber-600' : 'text-red-500'}
+          comparison={isCustomDateRange ? { value: summary.rpGrowth, label: 'vs periode sblmnya' } : undefined}
         />
         <KpiCard
           icon={Users}
@@ -200,6 +241,7 @@ export function TargetClient({
           value={summary.totalAchievedUser.toLocaleString()}
           sub={`${summary.userPct.toFixed(1)}% dari target`}
           subColor={summary.userPct >= 100 ? 'text-emerald-600 font-black' : summary.userPct >= 60 ? 'text-amber-600' : 'text-red-500'}
+          comparison={isCustomDateRange ? { value: summary.userGrowth, label: 'vs periode sblmnya' } : undefined}
         />
       </div>
 

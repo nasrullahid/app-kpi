@@ -53,7 +53,9 @@ export default async function AdsPage({
             programs={data.programs}
             activePeriod={data.activePeriod}
             metricValues={data.metricValues}
+            previousMetricValues={data.previousMetricValues}
             profiles={data.profiles}
+            isCustomDateRange={data.isCustomDateRange}
           />
         </Suspense>
       )}

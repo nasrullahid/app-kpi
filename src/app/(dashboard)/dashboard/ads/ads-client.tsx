@@ -37,20 +37,36 @@ interface AdsClientProps {
   programs: ProgramWithRelations[]
   activePeriod: Period
   metricValues: MetricValue[]
+  previousMetricValues?: MetricValue[]
   profiles: { id: string; name: string }[]
+  isCustomDateRange?: boolean
 }
 
-function KpiCard({ label, value, sub, subOk }: { label: string; value: string; sub?: string; subOk?: boolean }) {
+function KpiCard({ label, value, sub, subOk, comparison }: { label: string; value: string; sub?: string; subOk?: boolean; comparison?: { value: number; label: string } }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-      <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
-      <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
-      {sub && <p className={cn("text-xs font-bold", subOk === true ? 'text-emerald-600' : subOk === false ? 'text-red-500' : 'text-slate-400')}>{sub}</p>}
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+      <div>
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
+        <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
+        {sub && <p className={cn("text-xs font-bold mb-2", subOk === true ? 'text-emerald-600' : subOk === false ? 'text-red-500' : 'text-slate-400')}>{sub}</p>}
+      </div>
+      {comparison && (
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+          <span className={cn(
+            "text-xs font-bold px-1.5 py-0.5 rounded",
+            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+          )}>
+            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
+          </span>
+          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+        </div>
+      )}
     </div>
   )
 }
 
-export function AdsClient({ programs, metricValues, profiles }: AdsClientProps) {
+export function AdsClient({ programs, metricValues, previousMetricValues = [], profiles, isCustomDateRange }: AdsClientProps) {
   const [selectedProgramId, setSelectedProgramId] = useState<string>('all')
   const [metricX, setMetricX] = useState('budget_iklan')
   const [metricY, setMetricY] = useState('roas')
@@ -71,6 +87,16 @@ export function AdsClient({ programs, metricValues, profiles }: AdsClientProps) 
     aggregateAdsMetrics(targetPrograms, metricValues),
     [targetPrograms, metricValues]
   )
+
+  const prevAggregate = useMemo(() =>
+    isCustomDateRange ? aggregateAdsMetrics(targetPrograms, previousMetricValues) : null,
+    [targetPrograms, previousMetricValues, isCustomDateRange]
+  )
+
+  const getGrowth = (current: number, prev: number | undefined) => {
+    if (!prev || prev === 0) return 0
+    return ((current - prev) / prev) * 100
+  }
 
   // ── Daily chart data ─────────────────────────────────────────────────────
   const chartData = useMemo(() =>
@@ -122,23 +148,27 @@ export function AdsClient({ programs, metricValues, profiles }: AdsClientProps) 
         <KpiCard
           label="Total Ads Spent"
           value={formatRupiah(aggregate.totalAdsSpent)}
-          sub="bulan ini"
+          sub="periode ini"
+          comparison={prevAggregate ? { value: getGrowth(aggregate.totalAdsSpent, prevAggregate.totalAdsSpent), label: 'vs periode sblmnya' } : undefined}
         />
         <KpiCard
           label="Total Goals"
           value={aggregate.totalGoals.toLocaleString()}
           sub="closing/user"
+          comparison={prevAggregate ? { value: getGrowth(aggregate.totalGoals, prevAggregate.totalGoals), label: 'vs periode sblmnya' } : undefined}
         />
         <KpiCard
           label="Avg ROAS"
           value={`${aggregate.avgRoas.toFixed(2)}x`}
           sub={aggregate.avgRoas >= 1 ? 'Di atas 1x (profitable)' : 'Di bawah 1x (rugi)'}
           subOk={aggregate.avgRoas >= 1}
+          comparison={prevAggregate ? { value: getGrowth(aggregate.avgRoas, prevAggregate.avgRoas), label: 'vs periode sblmnya' } : undefined}
         />
         <KpiCard
           label="Avg CPP"
           value={aggregate.avgCpp > 0 ? formatRupiah(aggregate.avgCpp) : '-'}
           sub="per goal/closing"
+          comparison={prevAggregate ? { value: getGrowth(aggregate.avgCpp, prevAggregate.avgCpp), label: 'vs periode sblmnya' } : undefined}
         />
       </div>
 

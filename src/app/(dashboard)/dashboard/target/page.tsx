@@ -55,6 +55,9 @@ export default async function TargetPage({
             activePeriod={data.activePeriod}
             milestoneCompletions={data.milestoneCompletions}
             metricValues={data.metricValues}
+            previousMetricValues={data.previousMetricValues}
+            previousDailyInputs={data.previousDailyInputs}
+            isCustomDateRange={data.isCustomDateRange}
           />
         </Suspense>
       )}
