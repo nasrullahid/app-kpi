@@ -465,30 +465,6 @@ export function OverviewClient({
           </select>
         </div>
 
-        {/* Program Cards Grid */}
-        <div className="text-xs text-slate-400 font-medium">
-          Menampilkan {filteredPrograms.length} dari {programs.length} program
-        </div>
-        {filteredPrograms.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredPrograms.map((ph) => (
-              <ProgramCard
-                key={ph.program.id}
-                program={ph.program}
-                health={ph}
-                metricValues={metricValues}
-                milestoneCompletions={milestoneCompletions}
-                profiles={profiles}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 text-slate-400">
-            <Search className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-semibold">Tidak ada program yang cocok</p>
-          </div>
-        )}
-      </div>
 
       {/* ── Row 4: Charts ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -536,5 +512,31 @@ export function OverviewClient({
         </div>
       </div>
     </div>
+                  
+        {/* Program Cards Grid */}
+        <div className="text-xs text-slate-400 font-medium">
+          Menampilkan {filteredPrograms.length} dari {programs.length} program
+        </div>
+        {filteredPrograms.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredPrograms.map((ph) => (
+              <ProgramCard
+                key={ph.program.id}
+                program={ph.program}
+                health={ph}
+                metricValues={metricValues}
+                milestoneCompletions={milestoneCompletions}
+                profiles={profiles}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-slate-400">
+            <Search className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="font-semibold">Tidak ada program yang cocok</p>
+          </div>
+        )}
+      </div>
+
   )
 }
