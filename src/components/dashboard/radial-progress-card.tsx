@@ -34,8 +34,6 @@ interface RadialProgressCardProps {
 
 export function RadialProgressCard({
   title,
-  value,
-  target,
   percentage,
   displayValue,
   displayTarget,
