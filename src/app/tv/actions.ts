@@ -3,8 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database'
 import { 
-  calculateProgramHealth, 
-  aggregateByMetricGroup, 
   ProgramWithRelations,
   ProgramHealthResult,
   getHealthStatus,

@@ -134,7 +134,7 @@ export function DepartmentClient({
       const h = calculateProgramHealth(p, metricValues, dailyInputs, milestoneCompletions, prorationFactor, activePeriod.working_days || 0)
       return { ...h, program: p }
     }).sort((a, b) => b.healthScore - a.healthScore)
-  }, [programs, metricValues, dailyInputs, milestoneCompletions, prorationFactor])
+  }, [programs, metricValues, dailyInputs, milestoneCompletions, prorationFactor, activePeriod.working_days])
 
   const programsWithoutGroupsCount = programs.filter(p => {
      const hasMetrics = (p.program_metric_definitions || []).length > 0;

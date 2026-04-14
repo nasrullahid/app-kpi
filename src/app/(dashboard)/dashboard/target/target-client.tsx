@@ -300,8 +300,8 @@ export function TargetClient({
                 <YAxis tickFormatter={(v: number) => v >= 1e9 ? `${(v/1e9).toFixed(1)}M` : v >= 1e6 ? `${(v/1e6).toFixed(0)}jt` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={50} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
-                  formatter={(v: any) => [formatRupiah(Number(v || 0)), '']}
-                  labelFormatter={(l: any) => `Hari ke-${l}`}
+                  formatter={(v: unknown) => [formatRupiah(Number(v || 0)), '']}
+                  labelFormatter={(l: unknown) => `Hari ke-${l}`}
                 />
                 <ReferenceLine y={summary.totalTargetRp} stroke="#ef4444" strokeDasharray="4 4" opacity={0.5} label={{ value: 'TARGET', position: 'right', fill: '#ef4444', fontSize: 10 }} />
                 <Line type="monotone" dataKey="targetIdeal" stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
@@ -322,7 +322,7 @@ export function TargetClient({
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
-                  formatter={(v: any) => [formatRupiah(Number(v || 0)), '']}
+                  formatter={(v: unknown) => [formatRupiah(Number(v || 0)), '']}
                 />
                 <Bar dataKey="achieved" name="achieved" radius={[0, 6, 6, 0]} maxBarSize={14}>
                   {rpBarData.map((entry, idx) => (
