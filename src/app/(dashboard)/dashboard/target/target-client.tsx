@@ -45,16 +45,16 @@ function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }
   comparison?: { value: number; label: string }
 }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative flex flex-col justify-between transition-all hover:shadow-md hover:z-20">
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative flex flex-col justify-between transition-all hover:shadow-md hover:z-20 min-w-0">
       <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
         <div className={cn("absolute top-0 right-0 p-4 opacity-5", accent)}>
           <Icon className="w-20 h-20" />
         </div>
       </div>
-      <div>
-        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
-        <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
-        {sub && <p className={cn("text-xs font-bold mb-2", subColor || 'text-slate-400')}>{sub}</p>}
+      <div className="min-w-0">
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2 truncate" title={label}>{label}</p>
+        <p className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-800 mb-1 truncate" title={String(value)}>{value}</p>
+        {sub && <p className={cn("text-xs font-bold mb-2 truncate", subColor || 'text-slate-400')} title={sub}>{sub}</p>}
       </div>
       {comparison && (
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
@@ -235,7 +235,7 @@ export function TargetClient({
           label="Total Target Rp"
           accent="text-indigo-600"
           value={formatRupiah(summary.totalTargetRp)}
-          sub={`Pro-rata hari ini: ${formatRupiah(summary.proRataRp)}`}
+          sub={`Sisa Target: ${formatRupiah(Math.max(0, summary.totalTargetRp - summary.totalAchievedRp))}`}
           subColor="text-slate-400"
         />
         <KpiCard
@@ -252,7 +252,7 @@ export function TargetClient({
           label="Total Target User"
           accent="text-violet-600"
           value={summary.totalTargetUser.toLocaleString()}
-          sub={`Pro-rata: ${Math.round(summary.proRataUser).toLocaleString()} user`}
+          sub={`Sisa Target: ${Math.max(0, summary.totalTargetUser - summary.totalAchievedUser).toLocaleString()} user`}
           subColor="text-slate-400"
         />
         <KpiCard

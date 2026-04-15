@@ -82,10 +82,10 @@ function KpiCard({ icon: Icon, label, value, sub, iconClass, comparison }: {
         </div>
       </div>
       <div>
-        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3">{label}</p>
-        <div className="flex items-end gap-2">
-          <span className={cn("text-4xl font-black text-slate-800", iconClass)}>{value}</span>
-          {sub && <span className="text-sm text-slate-400 font-semibold mb-1">{sub}</span>}
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3 truncate" title={label}>{label}</p>
+        <div className="flex items-end gap-2 min-w-0">
+          <span className={cn("text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 truncate", iconClass)} title={String(value)}>{value}</span>
+          {sub && <span className="text-sm text-slate-400 font-semibold mb-1 truncate shrink-0">{sub}</span>}
         </div>
       </div>
       {comparison && (
@@ -426,9 +426,9 @@ export function OverviewClient({
           <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
             <div className="absolute top-0 right-0 p-4 opacity-5"><HeartPulse className="w-20 h-20" /></div>
           </div>
-          <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3">Health Score</p>
-          <div className="flex items-end gap-2">
-            <span className="text-4xl font-black text-slate-800">{overallHealth.toFixed(1)}%</span>
+          <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3 truncate">Health Score</p>
+          <div className="flex items-end gap-2 min-w-0">
+            <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 truncate">{overallHealth.toFixed(1)}%</span>
           </div>
           <div className="flex items-center gap-2 mt-2">
             <span className={cn("inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border", badge)}>
