@@ -83,15 +83,15 @@ function KpiCard({ icon: Icon, label, value, sub, iconClass, comparison }: {
       </div>
       <div>
         <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3 truncate" title={label}>{label}</p>
-        <div className="flex items-end gap-2 w-full" style={{ containerType: 'inline-size' }}>
+        <div className="flex items-end gap-2 w-full flex-wrap" style={{ containerType: 'inline-size' }}>
           <span className={cn(
-            "font-black text-slate-800 leading-none whitespace-nowrap",
-            "text-[min(2.25rem,14cqw)] sm:text-[min(3rem,14cqw)] lg:text-[min(3.75rem,14cqw)]",
+            "font-black text-slate-800 leading-none whitespace-nowrap drop-shadow-sm",
+            "text-[min(2.25rem,11cqw)] sm:text-[min(2.5rem,11cqw)] lg:text-[min(3rem,11cqw)]",
             iconClass
           )} title={String(value)}>
             {value}
           </span>
-          {sub && <span className="text-xs sm:text-sm text-slate-400 font-semibold mb-0.5 whitespace-nowrap shrink-0">{sub}</span>}
+          {sub && <span className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 whitespace-nowrap shrink-0">{sub}</span>}
         </div>
       </div>
       {comparison && (
@@ -134,96 +134,127 @@ function ProgramCard({ program, health, profiles }: {
   // Milestone progress for qualitative/hybrid
   const milestones = program.program_milestones || []
 
-  const teamNames = (program.program_pics || []).map(pic => {
-    const p = profiles.find(pr => pr.id === pic.profile_id)
-    return p?.name || '??'
-  })
+  const pics = (program.program_pics || []).map(pic => profiles.find(pr => pr.id === pic.profile_id)).filter(Boolean)
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200 p-5 flex flex-col gap-4 group">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            {program.department && (
-              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full">
-                {program.department}
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 overflow-hidden group flex flex-col">
+      {/* Top Banner Accent */}
+      <div className={cn("h-1.5 w-full", dot)} />
+      
+      <div className="p-5 flex-1 flex flex-col gap-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              {program.department && (
+                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">
+                  {program.department}
+                </span>
+              )}
+              <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border", badge)}>
+                {label}
               </span>
-            )}
+            </div>
+            <h3 className="font-extrabold text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2" title={program.name}>
+              {program.name}
+            </h3>
           </div>
-          <h3 className="font-bold text-slate-800 text-base leading-tight truncate group-hover:text-indigo-600 transition-colors cursor-pointer">{program.name}</h3>
-          {teamNames.length > 0 && (
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
-              PIC: {teamNames.join(' · ')}
-            </p>
+
+          <div className="flex flex-col items-end shrink-0 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+            <span className="text-2xl font-black text-slate-800 leading-none">{Math.round(health.healthScore)}%</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">Health</span>
+          </div>
+        </div>
+
+        {/* PIC Avatars & Team */}
+        {pics.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {pics.slice(0, 3).map((p, i) => (
+                <div key={p?.id} className="h-7 w-7 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-indigo-700 uppercase" title={p?.name}>
+                  {p?.name?.[0]}
+                </div>
+              ))}
+              {pics.length > 3 && (
+                <div className="h-7 w-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-500">
+                  +{pics.length - 3}
+                </div>
+              )}
+            </div>
+            <span className="text-[11px] font-medium text-slate-400 truncate">
+              {pics.map(p => p?.name).join(', ')}
+            </span>
+          </div>
+        )}
+
+        {/* Progress Section */}
+        <div className="space-y-4">
+          {primaryMetrics.length > 0 ? (
+            primaryMetrics.map(m => {
+              const actual = evaluatedMetrics[m.metric_key] || 0
+              const target = m.monthly_target || 0
+              const pct = target > 0 ? (actual / target) * 100 : 0
+              return (
+                <div key={m.id} className="space-y-1.5">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider">{m.label}</span>
+                    <span className="font-black text-slate-800">
+                      {formatMetricValue(actual, m.data_type, m.unit_label)}
+                      <span className="text-slate-400 font-medium ml-1">/ {formatMetricValue(target, m.data_type, m.unit_label)}</span>
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-1000", getProgressColor(pct))}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })
+          ) : isQualitative && milestones.length > 0 ? (
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="font-bold text-slate-500 uppercase tracking-wider">Project Progress</span>
+                <span className="font-black text-slate-800">{Math.round(health.healthScore)}%</span>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                <div
+                  className={cn("h-full rounded-full transition-all duration-1000", getProgressColor(health.healthScore))}
+                  style={{ width: `${Math.min(health.healthScore, 100)}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="py-2 text-[11px] text-slate-400 font-medium italic">Tidak ada parameter target utama.</div>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-2xl font-black text-slate-800">{Math.round(health.healthScore)}%</span>
-          <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border flex items-center gap-1", badge)}>
-            <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
-            {label}
-          </span>
-        </div>
-      </div>
-
-      {/* Progress Section */}
-      <div className="space-y-3">
-        {primaryMetrics.length > 0 ? (
-          primaryMetrics.map(m => {
-            const actual = evaluatedMetrics[m.metric_key] || 0
-            const target = m.monthly_target || 0
-            const pct = target > 0 ? (actual / target) * 100 : 0
-            return (
-              <div key={m.id} className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-500">{m.label}</span>
-                  <span className="font-bold text-slate-700">
-                    {formatMetricValue(actual, m.data_type, m.unit_label)}
-                    <span className="text-slate-400 font-normal ml-1">/ {formatMetricValue(target, m.data_type, m.unit_label)}</span>
+        {/* Secondary Metrics Grid */}
+        {secondaryMetrics.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-4 border-t border-slate-100">
+            {secondaryMetrics.slice(0, 6).map(m => {
+              const val = evaluatedMetrics[m.metric_key]
+              if (val === undefined || val === null) return null
+              return (
+                <div key={m.id} className="bg-slate-50/80 p-2 rounded-xl border border-slate-100 flex flex-col gap-0.5 min-w-0" style={{ containerType: 'inline-size' }}>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase truncate leading-none mb-1">{m.label}</span>
+                  <span className="text-[min(0.875rem,24cqw)] font-black text-slate-700 leading-tight whitespace-nowrap">
+                    {formatMetricValue(val, m.data_type, m.unit_label)}
                   </span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full transition-all duration-700", getProgressColor(pct))}
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })
-        ) : isQualitative && milestones.length > 0 ? (
-          <div className="space-y-1">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-semibold text-slate-500">Milestone</span>
-              <span className="font-bold text-slate-700">{Math.round(health.healthScore)}%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all duration-700", getProgressColor(health.healthScore))}
-                style={{ width: `${Math.min(health.healthScore, 100)}%` }}
-              />
-            </div>
+              )
+            })}
           </div>
-        ) : null}
+        ) : (
+          <div className="flex-1" /> // Spacer
+        )}
       </div>
 
-      {/* Secondary Metrics Chips */}
-      {secondaryMetrics.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
-          {secondaryMetrics.map(m => {
-            const val = evaluatedMetrics[m.metric_key]
-            if (val === undefined || val === null) return null
-            return (
-              <div key={m.id} className="text-[10px] font-bold px-2 py-1 bg-slate-50 text-slate-500 rounded-lg border border-slate-100 flex items-center gap-1">
-                <span className="text-slate-400">{m.label}:</span>
-                <span className="text-slate-700">{formatMetricValue(val, m.data_type, m.unit_label)}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Footer Sparkline Decoration (Dummy placeholder for aesthetic) */}
+      <div className="h-1 bg-slate-50 flex items-end">
+        <div className="w-full h-full bg-indigo-50/30 group-hover:bg-indigo-100/50 transition-colors" />
+      </div>
     </div>
   )
 }
@@ -358,24 +389,75 @@ export function OverviewClient({
             <KpiCard icon={CheckSquare} label="Milestone Done" value={globalKPIs.completedMilestones} sub={`dari ${globalKPIs.totalMilestones} total`} iconClass="text-indigo-600" />
           </div>
 
+          {/* Row 2: Charts (Moved up for visibility) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
+             <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                  <HeartPulse className="w-48 h-48" />
+                </div>
+                <h3 className="font-extrabold text-slate-800 mb-6 text-base flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 rounded-xl">
+                    <HeartPulse className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  Tren Kesehatan Bisnis Global
+                </h3>
+                <div className="h-72">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} />
+                        <YAxis hide domain={[0, 120]} />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' }} 
+                          itemStyle={{ fontWeight: 800, fontSize: 12 }}
+                        />
+                        <Line type="monotone" dataKey="health" stroke="#6366f1" strokeWidth={4} dot={{ r: 0 }} activeDot={{ r: 6, strokeWidth: 0, fill: '#6366f1' }} animationDuration={2000} />
+                      </LineChart>
+                   </ResponsiveContainer>
+                </div>
+             </div>
+             
+             <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 className="font-extrabold text-slate-800 mb-6 text-base flex items-center gap-3">
+                  <div className="p-2 bg-emerald-50 rounded-xl">
+                    <Target className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  Top Performers
+                </h3>
+                <div className="h-72">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barData} layout="vertical" margin={{ left: -20 }}>
+                        <XAxis type="number" hide />
+                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 700 }} width={100} tickFormatter={v => v.length > 12 ? v.slice(0, 10) + '...' : v} />
+                        <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 16, border: 'none' }} />
+                        <Bar dataKey="healthScore" radius={[0, 8, 8, 0]} maxBarSize={20}>
+                          {barData.map((e, i) => <Cell key={i} fill={e.healthScore >= 100 ? '#10b981' : '#6366f1'} />)}
+                        </Bar>
+                      </BarChart>
+                   </ResponsiveContainer>
+                </div>
+             </div>
+          </div>
+
           {/* Motivational Banner */}
-          <div className={cn("bg-gradient-to-r p-4 rounded-2xl text-center font-black tracking-widest text-sm text-white shadow-md", banner.bg)}>
-            {banner.text}
+          <div className={cn("bg-gradient-to-r p-5 rounded-3xl text-center font-black tracking-[0.2em] text-xs sm:text-sm text-white shadow-lg relative overflow-hidden", banner.bg)}>
+            <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px] pointer-events-none" />
+            <span className="relative z-10">{banner.text}</span>
           </div>
 
           {/* Search & Program Grid */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input type="text" placeholder="Cari program..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 font-medium" />
+          <div className="space-y-6 pt-2">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input type="text" placeholder="Cari program..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/50 text-slate-700 font-bold transition-all placeholder:text-slate-300 shadow-sm" />
               </div>
               <div className="flex gap-2">
-                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="px-3 py-2 text-sm font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700">
+                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="px-4 py-3 text-sm font-bold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 text-slate-600 shadow-sm">
                   <option value="all">Semua Dept</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700">
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-4 py-3 text-sm font-bold bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 text-slate-600 shadow-sm">
                   <option value="all">Semua Status</option>
                   <option value="excellent">Excellent</option>
                   <option value="baik">Baik</option>
@@ -386,56 +468,20 @@ export function OverviewClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
               {filteredPrograms.map(ph => (
                 <ProgramCard key={ph.program.id} program={ph.program} health={ph} profiles={profiles} />
               ))}
             </div>
             
             {filteredPrograms.length === 0 && (
-              <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                <p className="text-slate-400 font-bold">Tidak ada program yang sesuai dengan kriteria.</p>
+              <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center gap-4">
+                <div className="p-4 bg-white rounded-full shadow-sm">
+                  <Search className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="text-slate-400 font-bold tracking-wide">Tidak ada program yang sesuai dengan kriteria.</p>
               </div>
             )}
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4 text-sm flex items-center gap-2">
-                  <HeartPulse className="h-4 w-4 text-indigo-500" />
-                  Tren Health Score Bisnis
-                </h3>
-                <div className="h-64">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                        <YAxis hide domain={[0, 120]} />
-                        <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                        <Line type="monotone" dataKey="health" stroke="#6366f1" strokeWidth={3} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-                      </LineChart>
-                   </ResponsiveContainer>
-                </div>
-             </div>
-             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4 text-sm flex items-center gap-2">
-                  <Target className="h-4 w-4 text-emerald-500" />
-                  Top Performers
-                </h3>
-                <div className="h-64">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={barData} layout="vertical" margin={{ left: -20 }}>
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} width={100} tickFormatter={v => v.slice(0, 12) + '...'} />
-                        <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: 'none' }} />
-                        <Bar dataKey="healthScore" radius={[0, 4, 4, 0]} maxBarSize={15}>
-                          {barData.map((e, i) => <Cell key={i} fill={e.healthScore >= 100 ? '#10b981' : '#6366f1'} />)}
-                        </Bar>
-                      </BarChart>
-                   </ResponsiveContainer>
-                </div>
-             </div>
           </div>
         </div>
       )}
