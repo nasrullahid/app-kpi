@@ -56,6 +56,8 @@ export default async function AdsPage({
             previousMetricValues={data.previousMetricValues}
             profiles={data.profiles}
             isCustomDateRange={data.isCustomDateRange}
+            startDate={searchParams.startDate}
+            endDate={searchParams.endDate}
           />
         </Suspense>
       )}

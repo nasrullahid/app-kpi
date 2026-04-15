@@ -12,8 +12,9 @@ import {
 } from 'recharts'
 import {
   HeartPulse, Layers, Target, CheckSquare,
-  Search
+  Search, Info, ArrowUpRight, ArrowDownRight
 } from 'lucide-react'
+import { getPreviousPeriodLabel } from '@/lib/utils'
 
 type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
@@ -87,14 +88,21 @@ function KpiCard({ icon: Icon, label, value, sub, iconClass, comparison }: {
       </div>
       {comparison && (
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
-          <span className={cn(
-            "text-xs font-bold px-1.5 py-0.5 rounded",
-            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
-            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
-          )}>
-            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
-          </span>
-          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+          <div className="group/tooltip relative flex items-center gap-1.5">
+            <span className={cn(
+              "text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+              comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+              comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+            )}>
+              {comparison.value > 0 ? <ArrowUpRight className="h-3 w-3" /> : comparison.value < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+              {Math.abs(comparison.value).toFixed(1)}%
+            </span>
+            <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help transition-colors" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-all pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+              {comparison.label}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -312,6 +320,8 @@ export function OverviewClient({
     ? ((targetTercapai - prevTargetTercapai) / prevTargetTercapai) * 100
     : (prevTargetTercapai === 0 && targetTercapai > 0) ? 100 : 0
 
+  const prevPeriodLabel = useMemo(() => getPreviousPeriodLabel(startDate, endDate), [startDate, endDate])
+
   // ── Departments list ─────────────────────────────────────────────────────
   const departments = useMemo(() => {
     const depts = Array.from(new Set(programs.map(p => p.department).filter(Boolean))) as string[]
@@ -422,13 +432,21 @@ export function OverviewClient({
               {statusLabel}
             </span>
             {isCustomDateRange && prevOverallHealth !== null && (
-               <span className={cn(
-                "text-xs font-bold px-1.5 py-0.5 rounded",
-                healthGrowth > 0 ? "bg-emerald-100 text-emerald-700" : 
-                healthGrowth < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
-              )}>
-                {healthGrowth > 0 ? '+' : ''}{healthGrowth.toFixed(1)}% vs prev
-              </span>
+               <div className="group/tooltip relative flex items-center gap-1.5 mt-2">
+                 <span className={cn(
+                  "text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+                  healthGrowth > 0 ? "bg-emerald-100 text-emerald-700" : 
+                  healthGrowth < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+                )}>
+                  {healthGrowth > 0 ? <ArrowUpRight className="h-3 w-3" /> : healthGrowth < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+                  {Math.abs(healthGrowth).toFixed(1)}%
+                </span>
+                <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help transition-colors" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-all pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+                  {prevPeriodLabel}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -440,7 +458,7 @@ export function OverviewClient({
           value={targetTercapai} 
           sub={`/ ${programs.length} prog`} 
           iconClass="text-emerald-600" 
-          comparison={isCustomDateRange && prevTargetTercapai !== null ? { value: targetGrowth, label: 'vs periode sblmnya' } : undefined}
+          comparison={isCustomDateRange && prevTargetTercapai !== null ? { value: targetGrowth, label: prevPeriodLabel } : undefined}
         />
         <KpiCard icon={CheckSquare} label="Milestone Done" value={completedMilestones} sub={`/ ${totalMilestones} tugas`} iconClass="text-indigo-600" />
       </div>

@@ -9,7 +9,8 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, ArrowUpRight, ArrowDownRight, Info } from 'lucide-react'
+import { getPreviousPeriodLabel } from '@/lib/utils'
 
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 type Period = Database['public']['Tables']['periods']['Row']
@@ -40,11 +41,13 @@ interface AdsClientProps {
   previousMetricValues?: MetricValue[]
   profiles: { id: string; name: string }[]
   isCustomDateRange?: boolean
+  startDate?: string
+  endDate?: string
 }
 
 function KpiCard({ label, value, sub, subOk, comparison }: { label: string; value: string; sub?: string; subOk?: boolean; comparison?: { value: number; label: string } }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:shadow-md">
       <div>
         <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2">{label}</p>
         <p className="text-3xl font-black text-slate-800 mb-1">{value}</p>
@@ -52,24 +55,33 @@ function KpiCard({ label, value, sub, subOk, comparison }: { label: string; valu
       </div>
       {comparison && (
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
-          <span className={cn(
-            "text-xs font-bold px-1.5 py-0.5 rounded",
-            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
-            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
-          )}>
-            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
-          </span>
-          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+          <div className="group/tooltip relative flex items-center gap-1.5">
+            <span className={cn(
+              "text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+              comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+              comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+            )}>
+              {comparison.value > 0 ? <ArrowUpRight className="h-3 w-3" /> : comparison.value < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+              {Math.abs(comparison.value).toFixed(1)}%
+            </span>
+            <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help transition-colors" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-all pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+              {comparison.label}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+            </div>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-export function AdsClient({ programs, metricValues, previousMetricValues = [], profiles, isCustomDateRange }: AdsClientProps) {
+export function AdsClient({ programs, metricValues, previousMetricValues = [], profiles, isCustomDateRange, startDate, endDate }: AdsClientProps) {
   const [selectedProgramId, setSelectedProgramId] = useState<string>('all')
   const [metricX, setMetricX] = useState('budget_iklan')
   const [metricY, setMetricY] = useState('roas')
+
+  const prevPeriodLabel = useMemo(() => getPreviousPeriodLabel(startDate, endDate), [startDate, endDate])
 
   // ── Filter to ads programs only ──────────────────────────────────────────
   const adsPrograms = useMemo(() =>
@@ -189,7 +201,7 @@ export function AdsClient({ programs, metricValues, previousMetricValues = [], p
           label="Avg CPP"
           value={aggregate.avgCpp > 0 ? formatRupiah(aggregate.avgCpp) : '-'}
           sub="per goal/closing"
-          comparison={prevAggregate ? { value: getGrowth(aggregate.avgCpp, prevAggregate.avgCpp), label: 'vs periode sblmnya' } : undefined}
+          comparison={prevAggregate ? { value: getGrowth(aggregate.avgCpp, prevAggregate.avgCpp), label: prevPeriodLabel } : undefined}
         />
       </div>
 

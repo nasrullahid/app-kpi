@@ -6,7 +6,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine
 } from 'recharts'
-import { TrendingUp, Users, Target, CheckSquare } from 'lucide-react'
+import { TrendingUp, Users, Target, CheckSquare, ArrowUpRight, ArrowDownRight, Info } from 'lucide-react'
+import { getPreviousPeriodLabel } from '@/lib/utils'
 import { RadialProgressCard } from '@/components/dashboard/radial-progress-card'
 
 import { Database } from '@/types/database'
@@ -44,7 +45,7 @@ function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }
   comparison?: { value: number; label: string }
 }) {
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:shadow-md">
       <div className={cn("absolute top-0 right-0 p-4 opacity-5", accent)}>
         <Icon className="w-20 h-20" />
       </div>
@@ -55,14 +56,21 @@ function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }
       </div>
       {comparison && (
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
-          <span className={cn(
-            "text-xs font-bold px-1.5 py-0.5 rounded",
-            comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
-            comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
-          )}>
-            {comparison.value > 0 ? '+' : ''}{comparison.value.toFixed(1)}%
-          </span>
-          <span className="text-[10px] uppercase font-bold text-slate-400">{comparison.label}</span>
+          <div className="group/tooltip relative flex items-center gap-1.5">
+            <span className={cn(
+              "text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+              comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
+              comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
+            )}>
+              {comparison.value > 0 ? <ArrowUpRight className="h-3 w-3" /> : comparison.value < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+              {Math.abs(comparison.value).toFixed(1)}%
+            </span>
+            <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help transition-colors" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-all pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10">
+              {comparison.label}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -81,6 +89,8 @@ export function TargetClient({
   startDate,
   endDate
 }: TargetClientProps) {
+  const prevPeriodLabel = useMemo(() => getPreviousPeriodLabel(startDate, endDate), [startDate, endDate])
+
   // ── Collect primary revenue + user metrics from all programs ────────────
   const summary = useMemo(() => {
     const agg = dashboardSummary.aggregates
@@ -245,7 +255,7 @@ export function TargetClient({
           value={summary.totalAchievedUser.toLocaleString()}
           sub={`${summary.userPct.toFixed(1)}% dari target`}
           subColor={summary.userPct >= 100 ? 'text-emerald-600 font-black' : summary.userPct >= 60 ? 'text-amber-600' : 'text-red-500'}
-          comparison={isCustomDateRange ? { value: summary.userGrowth, label: 'vs periode sblmnya' } : undefined}
+          comparison={isCustomDateRange ? { value: summary.userGrowth, label: prevPeriodLabel } : undefined}
         />
       </div>
 
