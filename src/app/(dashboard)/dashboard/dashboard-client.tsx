@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import { getPreviousPeriodLabel } from '@/lib/utils'
 
-type MilestoneCompletion = Database['public']['Tables']['milestone_completions']['Row']
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
 type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
 type Period = Database['public']['Tables']['periods']['Row']
