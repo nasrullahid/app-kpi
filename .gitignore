@@ -36,3 +36,7 @@ yarn-error.log*
 next-env.d.ts
 ~$DASHBOARD_TARGET_fixed.xlsx
 AGENTS.md
+.agents/rules/formula-upgrade.md
+.agents/rules/formula-upgrade2.md
+.agents/rules/formula-upgrade3.md
+.agents/rules/formula-upgrade4.md

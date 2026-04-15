@@ -53,22 +53,46 @@ export async function getUnifiedDashboardData(options: {
 }): Promise<UnifiedDashboardData> {
   const supabase = createClient()
   
-  // 1. Active Period
-  let periodQuery = supabase.from('periods').select('*')
-  if (options.periodId) {
-    periodQuery = periodQuery.eq('id', options.periodId)
-  } else {
-    periodQuery = periodQuery.eq('is_active', true)
-  }
-  const { data: activePeriod } = await periodQuery.single()
+  // 1 & 2. Fetch Active Period and Programs in parallel
+  const [periodResult, programsResult] = await Promise.all([
+    (async () => {
+      let q = supabase.from('periods').select('*')
+      if (options.periodId) {
+        q = q.eq('id', options.periodId)
+      } else {
+        q = q.eq('is_active', true)
+      }
+      return q.single()
+    })(),
+    (async () => {
+      let q = supabase
+        .from('programs')
+        .select('*, program_pics(profile_id), program_milestones(*), program_metric_definitions(*)')
+        .eq('is_active', true)
 
-  if (!activePeriod) {
+      if (options.profileId && !options.isAdmin) {
+        const { data: myTeamPrograms } = await supabase
+          .from('program_pics')
+          .select('program_id')
+          .eq('profile_id', options.profileId)
+        const myProgramIds = myTeamPrograms?.map(tp => tp.program_id) || []
+        q = q.in('id', myProgramIds)
+      }
+      return q.order('name') as unknown as Promise<{ data: ProgramWithRelations[] | null }>
+    })()
+  ])
+
+  const activePeriod = periodResult.data
+  const programs = (programsResult.data || []) as ProgramWithRelations[]
+  const programIds = programs.map(p => p.id)
+
+  if (!activePeriod || programs.length === 0) {
     return {
-      programs: [],
+      programs: programs,
       dailyInputs: [],
       milestoneCompletions: [],
       metricValues: [],
-      activePeriod: null,
+      activePeriod: activePeriod || null,
       prorationFactor: 1,
       summary: {
         overallHealth: 0,
@@ -79,68 +103,68 @@ export async function getUnifiedDashboardData(options: {
     }
   }
 
-  // 2. Programs
-  let programsQuery = supabase
-    .from('programs')
-    .select('*, program_pics(profile_id), program_milestones(*), program_metric_definitions(*)')
-    .eq('is_active', true)
-
-  if (options.profileId && !options.isAdmin) {
-    const { data: myTeamPrograms } = await supabase
-      .from('program_pics')
-      .select('program_id')
-      .eq('profile_id', options.profileId)
-    const myProgramIds = myTeamPrograms?.map(tp => tp.program_id) || []
-    programsQuery = programsQuery.in('id', myProgramIds)
-  }
-
-  const { data: programsData } = await (programsQuery as unknown as { data: ProgramWithRelations[] | null })
-  const programs = (programsData || []) as ProgramWithRelations[]
-  const programIds = programs.map(p => p.id)
-
-  // 3. Daily Inputs
-  let dailyInputs: DailyInput[] = []
-  if (programIds.length > 0) {
-    let q = supabase.from('daily_inputs').select('*').in('program_id', programIds)
-    if (options.startDate && options.endDate) {
-      q = q.gte('date', options.startDate).lte('date', options.endDate)
-    } else {
-      q = q.eq('period_id', activePeriod.id)
-    }
-    const { data } = await q
-    dailyInputs = data || []
-  }
-
-  // 4. Metric Values
-  let metricValues: MetricValue[] = []
-  if (programIds.length > 0) {
-    let q = supabase.from('daily_metric_values').select('*').in('program_id', programIds)
-    if (options.startDate && options.endDate) {
-      q = q.gte('date', options.startDate).lte('date', options.endDate)
-    } else {
-      q = q.eq('period_id', activePeriod.id)
-    }
-    const { data } = await q
-    metricValues = data || []
-  }
-
-  // 5. Milestone Completions
+  // 3, 4, 5. Fetch all data for the period/range in parallel
   const milestoneIds = programs.flatMap(p => p.program_milestones?.map(m => m.id) || [])
-  let milestoneCompletionsQuery = supabase.from('milestone_completions').select('*').in('milestone_id', milestoneIds)
-  
-  if (options.startDate && options.endDate) {
-    milestoneCompletionsQuery = milestoneCompletionsQuery
-      .gte('completed_at', options.startDate)
-      .lte('completed_at', options.endDate + 'T23:59:59')
-  } else {
-    milestoneCompletionsQuery = milestoneCompletionsQuery.eq('period_id', activePeriod.id)
-  }
 
-  const { data: milestoneCompletions } = milestoneIds.length > 0
-    ? await milestoneCompletionsQuery
-    : { data: [] }
+  const [inputsResult, metricsResult, milestoneResult] = await Promise.all([
+    // Daily Inputs
+    (async () => {
+      let q = supabase.from('daily_inputs').select('*').in('program_id', programIds)
+      if (options.startDate && options.endDate) {
+        q = q.gte('date', options.startDate).lte('date', options.endDate)
+      } else {
+        q = q.eq('period_id', activePeriod.id)
+      }
+      return q
+    })(),
+    // Metric Values
+    (async () => {
+      let q = supabase.from('daily_metric_values').select('*').in('program_id', programIds)
+      if (options.startDate && options.endDate) {
+        q = q.gte('date', options.startDate).lte('date', options.endDate)
+      } else {
+        q = q.eq('period_id', activePeriod.id)
+      }
+      return q
+    })(),
+    // Milestone Completions
+    (async () => {
+      if (milestoneIds.length === 0) return { data: [] }
+      let q = supabase.from('milestone_completions').select('*').in('milestone_id', milestoneIds)
+      if (options.startDate && options.endDate) {
+        q = q.gte('completed_at', options.startDate).lte('completed_at', options.endDate + 'T23:59:59')
+      } else {
+        q = q.eq('period_id', activePeriod.id)
+      }
+      return q
+    })()
+  ])
 
-  // 6. Proration Factor & Summary
+  const dailyInputs = inputsResult.data || []
+  const metricValues = metricsResult.data || []
+  const milestoneCompletions = milestoneResult.data || []
+
+  // 6. Indexing for O(1) Lookups in Calculator
+  const metricValuesByProgram = new Map<string, MetricValue[]>()
+  metricValues.forEach(mv => {
+    const list = metricValuesByProgram.get(mv.program_id) || []
+    list.push(mv)
+    metricValuesByProgram.set(mv.program_id, list)
+  })
+
+  const dailyInputsByProgram = new Map<string, DailyInput[]>()
+  dailyInputs.forEach(di => {
+    const list = dailyInputsByProgram.get(di.program_id) || []
+    list.push(di)
+    dailyInputsByProgram.set(di.program_id, list)
+  })
+
+  const milestoneCompletionsByMilestone = new Map<string, MilestoneCompletion>()
+  milestoneCompletions.forEach(mc => {
+    milestoneCompletionsByMilestone.set(mc.milestone_id, mc as MilestoneCompletion)
+  })
+
+  // 7. Proration Factor & Summary
   const workingDays = activePeriod.working_days || 30
   const today = new Date().getDate()
   
@@ -155,13 +179,17 @@ export async function getUnifiedDashboardData(options: {
     prorationFactor = Math.min(today / workingDays, 1)
   }
 
-  const processSummary = (inputs: DailyInput[], values: MetricValue[]) => {
+  const processSummary = (
+    valsByProg: Map<string, MetricValue[]>, 
+    inputsByProg: Map<string, DailyInput[]>,
+    compsByMilestone: Map<string, MilestoneCompletion>
+  ) => {
     const programHealths = programs.map(p => {
       const health = calculateProgramHealth(
         p, 
-        values, 
-        inputs, 
-        (milestoneCompletions || []) as MilestoneCompletion[], 
+        valsByProg, 
+        inputsByProg, 
+        compsByMilestone, 
         prorationFactor,
         workingDays
       )
@@ -178,7 +206,7 @@ export async function getUnifiedDashboardData(options: {
       perluPerhatian: programHealths.filter(ph => ph.healthScore < 60).length
     }
 
-    const aggregates = aggregateByMetricGroup(programs, values, inputs, prorationFactor, workingDays)
+    const aggregates = aggregateByMetricGroup(programs, valsByProg, inputsByProg, prorationFactor, workingDays)
 
     return {
       overallHealth,
@@ -188,7 +216,7 @@ export async function getUnifiedDashboardData(options: {
     }
   }
 
-  const summary = processSummary(dailyInputs, metricValues)
+  const summary = processSummary(metricValuesByProgram, dailyInputsByProgram, milestoneCompletionsByMilestone)
 
   let previousData: UnifiedDashboardData['previousData'] = undefined
   if (options.includePrevious && options.startDate && options.endDate) {
@@ -205,18 +233,34 @@ export async function getUnifiedDashboardData(options: {
     const prevStartStr = prevStart.toISOString().split('T')[0]
     const prevEndStr = prevEnd.toISOString().split('T')[0]
 
-    // Fetch previous daily inputs
-    const { data: prevInp } = await supabase.from('daily_inputs').select('*').in('program_id', programIds).gte('date', prevStartStr).lte('date', prevEndStr)
-    const pDailyInputs = prevInp || []
+    // Fetch previous data in parallel
+    const [prevInpRes, prevMVRes] = await Promise.all([
+      supabase.from('daily_inputs').select('*').in('program_id', programIds).gte('date', prevStartStr).lte('date', prevEndStr),
+      supabase.from('daily_metric_values').select('*').in('program_id', programIds).gte('date', prevStartStr).lte('date', prevEndStr)
+    ])
 
-    // Fetch previous metric values
-    const { data: prevMV } = await supabase.from('daily_metric_values').select('*').in('program_id', programIds).gte('date', prevStartStr).lte('date', prevEndStr)
-    const pMetricValues = prevMV || []
+    const pDailyInputs = prevInpRes.data || []
+    const pMetricValues = prevMVRes.data || []
+
+    // Index previous data
+    const pMVByProg = new Map<string, MetricValue[]>()
+    pMetricValues.forEach(mv => {
+      const list = pMVByProg.get(mv.program_id) || []
+      list.push(mv)
+      pMVByProg.set(mv.program_id, list)
+    })
+
+    const pInpByProg = new Map<string, DailyInput[]>()
+    pDailyInputs.forEach(di => {
+      const list = pInpByProg.get(di.program_id) || []
+      list.push(di)
+      pInpByProg.set(di.program_id, list)
+    })
 
     previousData = {
       dailyInputs: pDailyInputs,
       metricValues: pMetricValues,
-      summary: processSummary(pDailyInputs, pMetricValues)
+      summary: processSummary(pMVByProg, pInpByProg, milestoneCompletionsByMilestone)
     }
   }
 

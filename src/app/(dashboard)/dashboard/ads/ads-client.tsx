@@ -82,15 +82,36 @@ export function AdsClient({ programs, metricValues, previousMetricValues = [], p
     ? adsPrograms
     : adsPrograms.filter(p => p.id === selectedProgramId)
 
+  // ── Indexing for O(1) Lookups ───────────────────────────────────────────
+  const metricValuesByProgram = useMemo(() => {
+    const map = new Map<string, MetricValue[]>()
+    metricValues.forEach(mv => {
+      const list = map.get(mv.program_id) || []
+      list.push(mv)
+      map.set(mv.program_id, list)
+    })
+    return map
+  }, [metricValues])
+
+  const prevMetricValuesByProgram = useMemo(() => {
+    const map = new Map<string, MetricValue[]>()
+    previousMetricValues.forEach(mv => {
+      const list = map.get(mv.program_id) || []
+      list.push(mv)
+      map.set(mv.program_id, list)
+    })
+    return map
+  }, [previousMetricValues])
+
   // ── Aggregate KPIs ───────────────────────────────────────────────────────
   const aggregate = useMemo(() =>
-    aggregateAdsMetrics(targetPrograms, metricValues),
-    [targetPrograms, metricValues]
+    aggregateAdsMetrics(targetPrograms, metricValuesByProgram),
+    [targetPrograms, metricValuesByProgram]
   )
 
   const prevAggregate = useMemo(() =>
-    isCustomDateRange ? aggregateAdsMetrics(targetPrograms, previousMetricValues) : null,
-    [targetPrograms, previousMetricValues, isCustomDateRange]
+    isCustomDateRange ? aggregateAdsMetrics(targetPrograms, prevMetricValuesByProgram) : null,
+    [targetPrograms, prevMetricValuesByProgram, isCustomDateRange]
   )
 
   const getGrowth = (current: number, prev: number | undefined) => {
@@ -100,21 +121,21 @@ export function AdsClient({ programs, metricValues, previousMetricValues = [], p
 
   // ── Daily chart data ─────────────────────────────────────────────────────
   const chartData = useMemo(() =>
-    buildAdsDailySeries(targetPrograms, metricValues, metricX, metricY),
-    [targetPrograms, metricValues, metricX, metricY]
+    buildAdsDailySeries(targetPrograms, metricValuesByProgram, metricX, metricY),
+    [targetPrograms, metricValuesByProgram, metricX, metricY]
   )
 
   // ── Per-program rows for table ───────────────────────────────────────────
   const programRows = useMemo(() =>
     adsPrograms.map(prog => {
-      const agg = aggregateAdsMetrics([prog], metricValues)
+      const agg = aggregateAdsMetrics([prog], metricValuesByProgram)
       const teamNames = (prog.program_pics || []).map(pic => {
         const p = profiles.find(pr => pr.id === pic.profile_id)
         return p?.name?.split(' ')[0] || '?'
       })
       return { prog, agg, teamNames }
     }),
-    [adsPrograms, metricValues, profiles]
+    [adsPrograms, metricValuesByProgram, profiles]
   )
 
   if (adsPrograms.length === 0) {
@@ -284,7 +305,7 @@ export function AdsClient({ programs, metricValues, previousMetricValues = [], p
 
               {/* Total row */}
               {programRows.length > 1 && (() => {
-                const totalAgg = aggregateAdsMetrics(adsPrograms, metricValues)
+                const totalAgg = aggregateAdsMetrics(adsPrograms, metricValuesByProgram)
                 return (
                   <tr className="bg-slate-100 font-black text-slate-800">
                     <td className="px-4 py-3 text-xs uppercase tracking-widest text-slate-500">TOTAL / AVG</td>
