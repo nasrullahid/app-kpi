@@ -27,7 +27,6 @@ interface OverviewClientProps {
   programs: ProgramWithRelations[]
   dailyInputs: DailyInput[]
   activePeriod: Period
-  milestoneCompletions: MilestoneCompletion[]
   metricValues: MetricValue[]
   profiles: { id: string; name: string }[]
   prorationFactor: number
@@ -228,7 +227,6 @@ function ProgramCard({ program, health, profiles }: {
 export function OverviewClient({
   programs,
   activePeriod,
-  milestoneCompletions,
   metricValues,
   profiles,
   summary,
