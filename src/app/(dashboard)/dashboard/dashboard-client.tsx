@@ -102,11 +102,11 @@ function KpiCard({ icon: Icon, label, value, sub, iconClass, comparison }: {
 }
 
 // ── Individual Program Card ───────────────────────────────────────────────────
-function ProgramCard({ program, health, metricValues, milestoneCompletions, profiles }: {
+function ProgramCard({ program, health, metricValuesByProgram, milestoneCompletionsByMilestone, profiles }: {
   program: ProgramWithRelations
   health: ReturnType<typeof calculateProgramHealth>
-  metricValues: MetricValue[]
-  milestoneCompletions: MilestoneCompletion[]
+  metricValuesByProgram: Map<string, MetricValue[]>
+  milestoneCompletionsByMilestone: Map<string, MilestoneCompletion>
   profiles: { id: string; name: string }[]
 }) {
   const { label, dot, badge } = getStatusLabelAndColor(health.healthScore)
@@ -118,7 +118,7 @@ function ProgramCard({ program, health, metricValues, milestoneCompletions, prof
 
   // Milestone progress for qualitative
   const msIds = program.program_milestones?.map(m => m.id) || []
-  const completedMs = milestoneCompletions.filter(c => msIds.includes(c.milestone_id) && c.is_completed).length
+  const completedMs = msIds.filter(id => milestoneCompletionsByMilestone.get(id)?.is_completed).length
   const totalMs = msIds.length
 
   const teamNames = (program.program_pics || []).map(pic => {
@@ -172,7 +172,7 @@ function ProgramCard({ program, health, metricValues, milestoneCompletions, prof
             {/* Recent milestones */}
             <div className="space-y-1 pt-1">
               {program.program_milestones?.slice(0, 3).map(ms => {
-                const done = milestoneCompletions.some(c => c.milestone_id === ms.id && c.is_completed)
+                const done = milestoneCompletionsByMilestone.get(ms.id)?.is_completed || false
                 return (
                   <div key={ms.id} className="flex items-center gap-2 text-xs text-slate-500">
                     <span>{done ? '✓' : '○'}</span>
@@ -184,7 +184,8 @@ function ProgramCard({ program, health, metricValues, milestoneCompletions, prof
           </>
         ) : primaryMetrics.length > 0 ? (
           primaryMetrics.map(m => {
-            const vals = metricValues.filter(mv => mv.metric_definition_id === m.id && mv.program_id === program.id)
+            const progVals = metricValuesByProgram.get(program.id) || []
+            const vals = progVals.filter(mv => mv.metric_definition_id === m.id)
             const achieved = vals.reduce((sum, v) => sum + Number(v.value || 0), 0)
             const target = m.monthly_target || 0
             const pct = target > 0 ? Math.min((achieved / target) * 100, 100) : 0
@@ -234,7 +235,8 @@ function ProgramCard({ program, health, metricValues, milestoneCompletions, prof
       {secondaryMetrics.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
           {secondaryMetrics.map(m => {
-            const vals = metricValues.filter(mv => mv.metric_definition_id === m.id && mv.program_id === program.id)
+            const progVals = metricValuesByProgram.get(program.id) || []
+            const vals = progVals.filter(mv => mv.metric_definition_id === m.id)
             const val = vals.reduce((sum, v) => sum + Number(v.value || 0), 0)
             return (
               <span key={m.id} className="text-[10px] font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded-full border border-slate-200">
@@ -266,6 +268,35 @@ export function OverviewClient({
   const [filterDept, setFilterDept] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy, setSortBy] = useState<'health' | 'name'>('health')
+
+  // ── Indexing for O(1) Lookups ───────────────────────────────────────────
+  const metricValuesByProgram = useMemo(() => {
+    const map = new Map<string, MetricValue[]>()
+    metricValues.forEach(mv => {
+      const list = map.get(mv.program_id) || []
+      list.push(mv)
+      map.set(mv.program_id, list)
+    })
+    return map
+  }, [metricValues])
+
+  const dailyInputsByProgram = useMemo(() => {
+    const map = new Map<string, DailyInput[]>()
+    dailyInputs.forEach(di => {
+      const list = map.get(di.program_id) || []
+      list.push(di)
+      map.set(di.program_id, list)
+    })
+    return map
+  }, [dailyInputs])
+
+  const milestoneCompletionsByMilestone = useMemo(() => {
+    const map = new Map<string, MilestoneCompletion>()
+    milestoneCompletions.forEach(mc => {
+      map.set(mc.milestone_id, mc)
+    })
+    return map
+  }, [milestoneCompletions])
 
   // ── Computed stats (from shared summary) ───────────────────────────────────────────────────────
   const programHealths = summary.programHealths
@@ -338,13 +369,26 @@ export function OverviewClient({
       
       // Calculate active factor based on selection vs full period
       const totalDays = activePeriod.working_days || 30
-      // For trend purposes, we still use the cumulative factor up to that point
-      // If in custom mode, we should ideally use the selection's context, 
-      // but for "Health Score" trend it usually means "How was the health ON that day"
       const dayFactor = (i + 1) / totalDays 
 
+      // For trend, we need to index the sub-filtered data too, or just accept the tiny overhead here
+      // Since it's a loop of ~30, we'll just prep the maps for each day
+      const subIMap = new Map<string, DailyInput[]>()
+      subInputs.forEach(inp => {
+        const l = subIMap.get(inp.program_id) || []
+        l.push(inp)
+        subIMap.set(inp.program_id, l)
+      })
+
+      const subMMap = new Map<string, MetricValue[]>()
+      subMetrics.forEach(mv => {
+        const l = subMMap.get(mv.program_id) || []
+        l.push(mv)
+        subMMap.set(mv.program_id, l)
+      })
+
       const dayHealths = programs.map(p =>
-        calculateProgramHealth(p as CalcProgramWithRelations, subMetrics, subInputs, milestoneCompletions, dayFactor, totalDays)
+        calculateProgramHealth(p as CalcProgramWithRelations, subMMap, subIMap, milestoneCompletionsByMilestone, dayFactor, totalDays)
       )
       const avg = dayHealths.length > 0 ? dayHealths.reduce((s, h) => s + h.healthScore, 0) / dayHealths.length : 0
       
@@ -524,8 +568,8 @@ export function OverviewClient({
                 key={ph.program.id}
                 program={ph.program}
                 health={ph}
-                metricValues={metricValues}
-                milestoneCompletions={milestoneCompletions}
+                metricValuesByProgram={metricValuesByProgram}
+                milestoneCompletionsByMilestone={milestoneCompletionsByMilestone}
                 profiles={profiles}
               />
             ))}

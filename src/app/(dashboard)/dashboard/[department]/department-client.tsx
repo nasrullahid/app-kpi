@@ -111,6 +111,35 @@ export function DepartmentClient({
     router.push(`${pathname}?${params.toString()}`)
   }
 
+  // ── Indexing for O(1) Lookups ───────────────────────────────────────────
+  const metricValuesByProgram = useMemo(() => {
+    const map = new Map<string, MetricValue[]>()
+    metricValues.forEach(mv => {
+      const list = map.get(mv.program_id) || []
+      list.push(mv)
+      map.set(mv.program_id, list)
+    })
+    return map
+  }, [metricValues])
+
+  const dailyInputsByProgram = useMemo(() => {
+    const map = new Map<string, DailyInput[]>()
+    dailyInputs.forEach(di => {
+      const list = map.get(di.program_id) || []
+      list.push(di)
+      map.set(di.program_id, list)
+    })
+    return map
+  }, [dailyInputs])
+
+  const milestoneCompletionsByMilestone = useMemo(() => {
+    const map = new Map<string, MilestoneCompletion>()
+    milestoneCompletions.forEach(mc => {
+      map.set(mc.milestone_id, mc)
+    })
+    return map
+  }, [milestoneCompletions])
+
   const daysInSelection = useMemo(() => {
     if (isFilterActive && dateRange?.from && dateRange?.to) {
       const diffTime = Math.abs(dateRange.to.getTime() - dateRange.from.getTime())
@@ -125,16 +154,16 @@ export function DepartmentClient({
 
   // 1. Setup Aggregations
   const aggregations = useMemo(() => {
-    return aggregateByMetricGroup(programs, metricValues, dailyInputs, prorationFactor, activePeriod.working_days || 0)
-  }, [programs, metricValues, dailyInputs, prorationFactor, activePeriod.working_days])
+    return aggregateByMetricGroup(programs, metricValuesByProgram, dailyInputsByProgram, prorationFactor, activePeriod.working_days || 0)
+  }, [programs, metricValuesByProgram, dailyInputsByProgram, prorationFactor, activePeriod.working_days])
 
   // 2. Program Details
   const programHealths = useMemo(() => {
     return programs.map(p => {
-      const h = calculateProgramHealth(p, metricValues, dailyInputs, milestoneCompletions, prorationFactor, activePeriod.working_days || 0)
+      const h = calculateProgramHealth(p, metricValuesByProgram, dailyInputsByProgram, milestoneCompletionsByMilestone, prorationFactor, activePeriod.working_days || 0)
       return { ...h, program: p }
     }).sort((a, b) => b.healthScore - a.healthScore)
-  }, [programs, metricValues, dailyInputs, milestoneCompletions, prorationFactor, activePeriod.working_days])
+  }, [programs, metricValuesByProgram, dailyInputsByProgram, milestoneCompletionsByMilestone, prorationFactor, activePeriod.working_days])
 
   const programsWithoutGroupsCount = programs.filter(p => {
      const hasMetrics = (p.program_metric_definitions || []).length > 0;
@@ -272,7 +301,8 @@ export function DepartmentClient({
                ) : (
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     {ph.program.program_metric_definitions?.filter(m => m.is_target_metric).slice(0, 4).map(m => {
-                      const mv = metricValues.filter(v => v.program_id === ph.programId && v.metric_definition_id === m.id)
+                      const progVals = metricValuesByProgram.get(ph.programId) || []
+                      const mv = progVals.filter(v => v.metric_definition_id === m.id)
                       const sum = mv.reduce((s, a) => s + (a.value || 0), 0)
                       return (
                         <div key={m.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col justify-between">
