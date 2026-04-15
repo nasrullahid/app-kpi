@@ -57,7 +57,7 @@ function KpiCard({ label, value, sub, subOk, comparison }: { label: string; valu
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
           <div className="group/tooltip relative flex items-center gap-1.5">
             <span className={cn(
-              "text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5",
+              "text-xs font-bold px-1 py-0.5 rounded flex items-center gap-0.5",
               comparison.value > 0 ? "bg-emerald-100 text-emerald-700" : 
               comparison.value < 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
             )}>
