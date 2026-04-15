@@ -59,7 +59,11 @@ export async function applyMetricTemplate(
     return { success: true }
   }
 
-  const rows = metrics.map(m => ({ ...m, program_id: programId }))
+  const rows = metrics.map(m => ({ 
+    target_direction: 'higher_is_better',
+    ...m, 
+    program_id: programId 
+  }))
   const { error } = await supabase.from('program_metric_definitions').insert(rows)
   if (error) return { error: error.message }
 

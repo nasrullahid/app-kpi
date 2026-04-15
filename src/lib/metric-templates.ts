@@ -41,6 +41,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 1,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'ad_spend',
@@ -53,6 +54,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 2,
         formula: null,
+        target_direction: 'lower_is_better',
       },
 
       // ─── RAW INPUT: REACH & IMPRESSIONS ──────────────────────────
@@ -67,6 +69,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'orang',
         display_order: 3,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'impressions',
@@ -79,6 +82,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'tayangan',
         display_order: 4,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: CLICKS ────────────────────────────────────────
@@ -93,6 +97,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'klik',
         display_order: 5,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: LANDING PAGE ──────────────────────────────────
@@ -107,6 +112,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'view',
         display_order: 6,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: LEADS ─────────────────────────────────────────
@@ -121,6 +127,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 7,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'qualified_leads',
@@ -133,6 +140,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 8,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'invalid_leads',
@@ -145,6 +153,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 9,
         formula: null,
+        target_direction: 'lower_is_better',
       },
 
       // ─── RAW INPUT: CONVERSION PATH ───────────────────────────────
@@ -159,6 +168,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'chat',
         display_order: 10,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'form_started',
@@ -171,6 +181,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'orang',
         display_order: 11,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'form_submitted',
@@ -183,6 +194,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'orang',
         display_order: 12,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'initiated_registration',
@@ -195,6 +207,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'orang',
         display_order: 13,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: REVENUE ───────────────────────────────────────
@@ -209,6 +222,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 14,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: CREATIVE ──────────────────────────────────────
@@ -223,6 +237,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'creative',
         display_order: 15,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'creative_winners',
@@ -235,6 +250,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'creative',
         display_order: 16,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: CHANNEL (opsional, multi-channel) ─────────────
@@ -249,6 +265,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 17,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'total_leads_all_channels',
@@ -261,6 +278,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 18,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'channel_qualified_leads',
@@ -273,6 +291,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 19,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'total_ql_all_channels',
@@ -285,6 +304,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'lead',
         display_order: 20,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── RAW INPUT: BASELINE & TARGET ──
@@ -299,6 +319,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 21,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'baseline_cpm',
@@ -311,6 +332,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 22,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'baseline_cost_lp_view',
@@ -323,6 +345,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 23,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'target_cpl',
@@ -335,6 +358,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 24,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'target_cpql',
@@ -347,6 +371,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 25,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'target_wa_chat_rate',
@@ -359,6 +384,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: '%',
         display_order: 26,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'target_cost_reg',
@@ -371,6 +397,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'Rp',
         display_order: 27,
         formula: null,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'target_roas',
@@ -383,6 +410,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: 'x',
         display_order: 28,
         formula: null,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'trend_efficiency',
@@ -395,6 +423,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         unit_label: '%',
         display_order: 29,
         formula: null,
+        target_direction: 'higher_is_better',
       },
 
       // ─── CALCULATED: AD PERFORMANCE ──────────────────────────────
@@ -409,6 +438,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: null,
         unit_label: 'x',
         display_order: 30,
+        target_direction: 'lower_is_better',
       },
       {
         metric_key: 'ctr',
@@ -637,6 +667,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: null,
         unit_label: '%',
         display_order: 47,
+        target_direction: 'lower_is_better',
       },
 
       // ─── CALCULATED: CREATIVE & CHANNEL ──────────────────────────
@@ -664,6 +695,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: null,
         unit_label: '%',
         display_order: 49,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'channel_contribution_ql',
@@ -676,6 +708,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: null,
         unit_label: '%',
         display_order: 50,
+        target_direction: 'higher_is_better',
       },
 
       // ─── CALCULATED: SCORES (IF Logic) ─────────────────────────────
@@ -778,6 +811,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         display_order: 57,
         show_on_dashboard: true,
         show_on_tv: true,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'area_score_traffic_quality',
@@ -792,6 +826,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         display_order: 58,
         show_on_dashboard: true,
         show_on_tv: true,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'area_score_leads',
@@ -806,6 +841,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         display_order: 59,
         show_on_dashboard: true,
         show_on_tv: true,
+        target_direction: 'higher_is_better',
       },
       {
         metric_key: 'area_score_revenue',
@@ -820,6 +856,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         display_order: 60,
         show_on_dashboard: true,
         show_on_tv: true,
+        target_direction: 'higher_is_better',
       },
     ],
   },
