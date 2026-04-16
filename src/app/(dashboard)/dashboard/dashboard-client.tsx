@@ -92,7 +92,7 @@ function KpiCard({ icon: Icon, label, value, sub, accentColor, comparison }: {
       <div>
         <p className="text-[10px] font-bold tracking-[0.05em] text-[#6B7280] uppercase mb-2 truncate" title={label}>{label}</p>
         <div className="flex items-baseline gap-2 w-full flex-wrap min-w-0">
-          <span className="text-xl sm:text-2xl lg:text-[28px] font-semibold text-[#111827] leading-tight tabular-nums break-words" title={String(value)}>
+          <span className="text-[clamp(1rem,3.5vw,1.375rem)] font-semibold text-[#111827] leading-tight tabular-nums break-words" title={String(value)}>
             {value}
           </span>
           {sub && <span className="text-[12px] text-[#6B7280] font-normal truncate min-w-0">{sub}</span>}
