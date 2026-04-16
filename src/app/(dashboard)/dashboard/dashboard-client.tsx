@@ -61,7 +61,8 @@ function getBannerInfo(score: number) {
 }
 
 function calculateGrowth(current: number, previous: number): number {
-  if (!previous || previous === 0) return 0
+  if (current === 0 && previous === 0) return 0
+  if (!previous || previous === 0) return current > 0 ? 100 : 0
   return ((current - previous) / previous) * 100
 }
 
