@@ -712,23 +712,48 @@ export function OverviewClient({
              </div>
           </div>
 
-          {/* Revenue Bar Chart (Full Width) */}
+          {/* Revenue & User Bar Chart (Full Width) */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-800 mb-4 text-sm flex items-center gap-2">
               <Target className="h-4 w-4 text-emerald-500" />
-              Capaian Pendapatan per Program (Rp)
+              Capaian Pendapatan & User per Program
             </h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={programHealths.sort((a, b) => (b.calculatedMetrics?.revenue || 0) - (a.calculatedMetrics?.revenue || 0)).slice(0, 8)}>
+                <BarChart data={programHealths.sort((a, b) => (b.calculatedMetrics?.revenue || 0) - (a.calculatedMetrics?.revenue || 0)).slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="program.name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v: string) => v.length > 12 ? v.substring(0, 10) + '...' : v} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v: number) => `Rp${v/1000000}jt`} />
+                  <XAxis 
+                    dataKey="program.name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                    tickFormatter={(v: string) => v.length > 12 ? v.substring(0, 10) + '...' : v} 
+                  />
+                  <YAxis 
+                    yAxisId="left"
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                    tickFormatter={(v: number) => `Rp${v/1000000}jt`} 
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                    tickFormatter={(v: number) => `${v} user`} 
+                  />
                   <Tooltip 
                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(v: string | number | readonly (string | number)[] | undefined) => [formatRupiah(Number(Array.isArray(v) ? v[0] : (v || 0))), 'Pendapatan']}
+                    formatter={(val: number, name: string) => {
+                      if (name === 'Pendapatan') return [formatRupiah(val), name]
+                      return [val, name]
+                    }}
                   />
-                  <Bar dataKey="calculatedMetrics.revenue" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingBottom: '10px' }} />
+                  <Bar yAxisId="left" dataKey="calculatedMetrics.revenue" name="Pendapatan" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar yAxisId="right" dataKey="calculatedMetrics.user_count" name="Jumlah User" fill="#378ADD" radius={[4, 4, 0, 0]} maxBarSize={30} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
