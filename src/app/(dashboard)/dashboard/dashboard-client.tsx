@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { Database } from '@/types/database'
 import { ProgramWithRelations, MetricValue } from './actions'
 import { 
   calculateProgramHealth, 
