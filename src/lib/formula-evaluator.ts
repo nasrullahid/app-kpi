@@ -433,7 +433,7 @@ export function formatMetricValue(
       return `Rp ${value.toLocaleString('id-ID')}`
     }
     case 'percentage':
-      return `${value.toFixed(1)}%`
+      return `${(value * 100).toFixed(1)}%`
     case 'float':
       return `${value.toFixed(2)}${unitLabel ? ' ' + unitLabel : ''}`
     case 'integer':

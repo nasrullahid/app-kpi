@@ -145,6 +145,16 @@ export function InputFormClient({
     }
     setEditingId(input.id)
     setSelectedProgramId(input.program_id)
+    
+    // Load existing metric values for this specific input (date + program)
+    const init: Record<string, string> = {}
+    allPeriodMetricValues
+      .filter(mv => mv.program_id === input.program_id && mv.date === input.date)
+      .forEach(mv => {
+        init[mv.metric_definition_id] = mv.value?.toString() || ''
+      })
+    setMetricValues(init)
+    
     setIsModalOpen(true)
   }
 
@@ -212,8 +222,8 @@ export function InputFormClient({
         return
       }
 
-      // Save custom metric values if program has them (new entry only)
-      if (hasCustomMetrics && !editingId) {
+      // Save custom metric values if program has them
+      if (hasCustomMetrics) {
         const date = formData.get('date') as string
         const valuesToSave = activeMetrics
           .filter(m => m.input_type === 'manual')
@@ -526,7 +536,7 @@ export function InputFormClient({
                   )}
 
                   {/* Dynamic Metric Fields - Optimized Grid */}
-                  {hasCustomMetrics && !editingId && (
+                  {hasCustomMetrics && (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-[0.1em]">
                         <Target className="h-3 w-3" /> Input KPI Utama
