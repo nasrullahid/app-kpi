@@ -92,13 +92,13 @@ export function Slide1Total({ data }: Slide1Props) {
                   <span className="text-lg font-bold text-slate-200 uppercase tracking-widest">{config.label}</span>
                 </div>
                 
-                <div className="mb-4">
-                  <div className="text-5xl font-black text-slate-50 truncate">
+                <div className="mb-4 w-full" style={{ containerType: 'inline-size' }}>
+                  <div className="text-[min(3rem,14cqw)] font-black text-slate-50 leading-none whitespace-nowrap drop-shadow-sm">
                     {config.isCurrency ? formatRupiah(group.actual) : group.actual.toLocaleString()}
                     {!config.isCurrency && key === 'efficiency' && 'x'}
                   </div>
                   {group.target > 0 && (
-                    <div className="text-sm font-bold text-slate-500 uppercase mt-1">
+                    <div className="text-sm font-bold text-slate-500 uppercase mt-2">
                       Target: {config.isCurrency ? formatRupiah(group.target) : group.target.toLocaleString()}
                     </div>
                   )}

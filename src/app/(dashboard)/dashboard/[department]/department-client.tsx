@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { Database } from '@/types/database'
 import { getDepartmentConfig } from '@/lib/department-config'
 import { calculateProgramHealth, aggregateByMetricGroup, ProgramWithRelations } from '@/lib/dashboard-calculator'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, cn } from '@/lib/utils'
 import { formatMetricValue } from '@/lib/formula-evaluator'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { 
@@ -226,8 +226,12 @@ export function DepartmentClient({
                  <div key={key} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
                     <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">{getGroupLabel(key)}</div>
                     
-                    <div className="flex items-baseline gap-2 mb-3">
-                      <span className={`text-2xl font-black ${g.isComputed ? 'text-indigo-700' : 'text-slate-800'}`}>
+                    <div className="flex items-end gap-2 mb-3 w-full" style={{ containerType: 'inline-size' }}>
+                      <span className={cn(
+                        "font-black leading-none whitespace-nowrap drop-shadow-sm",
+                        "text-[min(1.5rem,12cqw)] sm:text-[min(1.75rem,12cqw)] lg:text-[min(2rem,12cqw)]",
+                        g.isComputed ? 'text-indigo-700' : 'text-slate-800'
+                      )}>
                         {formatGroupValue(key, g.actual)}
                       </span>
                     </div>
@@ -305,9 +309,11 @@ export function DepartmentClient({
                       const mv = progVals.filter(v => v.metric_definition_id === m.id)
                       const sum = mv.reduce((s, a) => s + (a.value || 0), 0)
                       return (
-                        <div key={m.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col justify-between">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 truncate">{m.label}</span>
-                          <span className="font-bold text-slate-700">{formatMetricValue(sum, m.data_type, m.unit_label)}</span>
+                        <div key={m.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col justify-between min-w-0" style={{ containerType: 'inline-size' }}>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 truncate mb-1">{m.label}</span>
+                          <span className="font-black text-slate-700 leading-tight text-[min(0.875rem,24cqw)] whitespace-nowrap">
+                            {formatMetricValue(sum, m.data_type, m.unit_label)}
+                          </span>
                         </div>
                       )
                     })}

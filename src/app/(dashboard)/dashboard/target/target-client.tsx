@@ -52,9 +52,16 @@ function KpiCard({ label, value, sub, subColor, icon: Icon, accent, comparison }
         </div>
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-2 truncate" title={label}>{label}</p>
-        <p className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-800 mb-1 truncate" title={String(value)}>{value}</p>
-        {sub && <p className={cn("text-xs font-bold mb-2 truncate", subColor || 'text-slate-400')} title={sub}>{sub}</p>}
+        <p className="text-xs font-black tracking-[0.15em] text-slate-400 uppercase mb-3 truncate" title={label}>{label}</p>
+        <div className="flex items-end gap-2 w-full flex-wrap" style={{ containerType: 'inline-size' }}>
+          <span className={cn(
+            "font-black text-slate-800 leading-none whitespace-nowrap drop-shadow-sm",
+            "text-[min(2.25rem,11cqw)] sm:text-[min(2.5rem,11cqw)] lg:text-[min(3rem,11cqw)]",
+          )} title={String(value)}>
+            {value}
+          </span>
+          {sub && <span className={cn("text-[10px] sm:text-xs font-bold mb-1 whitespace-nowrap shrink-0", subColor || 'text-slate-400')} title={sub}>{sub}</span>}
+        </div>
       </div>
       {comparison && (
         <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">

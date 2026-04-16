@@ -434,29 +434,31 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                     const isLower = metric.target_direction === 'lower_is_better'
 
                     return (
-                      <Card key={metric.id} className="p-5" accentColor="#00d4ff">
+                      <Card key={metric.id} className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
                         <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
                           {metric.label}
                         </div>
-                        <div
-                          className="text-3xl font-black text-white mb-1"
-                          style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                        >
-                          {metric.data_type === 'currency'
-                            ? formatRupiah(achieved)
-                            : formatMetricValue(achieved, metric.data_type, metric.unit_label)}
-                        </div>
-                        <div className="text-[10px] text-slate-500 uppercase mb-3">
-                          Target: {metric.data_type === 'currency'
-                            ? formatRupiah(target)
-                            : formatMetricValue(target, metric.data_type, metric.unit_label)}
+                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
+                          <div
+                            className="text-[min(2rem,15cqw)] font-black text-white whitespace-nowrap leading-none mb-1"
+                            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                          >
+                            {metric.data_type === 'currency'
+                              ? formatRupiah(achieved)
+                              : formatMetricValue(achieved, metric.data_type, metric.unit_label)}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-3">
+                            Target: {metric.data_type === 'currency'
+                              ? formatRupiah(target)
+                              : formatMetricValue(target, metric.data_type, metric.unit_label)}
+                          </div>
                         </div>
                         <ProgressBar
                           pct={isLower ? Math.max(0, 100 - pct + 100) : pct}
                           color="linear-gradient(90deg, #00aacc, #00d4ff)"
                         />
-                        <div className="text-[10px] text-slate-500 mt-1.5">
-                          {isLower ? '↓ Lower better' : 'Pencapaian'}:{' '}
+                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
+                          <span>{isLower ? '↓ Lower better' : 'Pencapaian'}</span>
                           <span className="text-cyan-400 font-bold">{pct.toFixed(1)}%</span>
                         </div>
                       </Card>
@@ -466,22 +468,24 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                   <>
                     {/* Legacy Capital */}
                     {(program.monthly_target_rp || 0) > 0 && (
-                      <Card className="p-5" accentColor="#00d4ff">
+                      <Card className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
                         <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
                           Target Capital (RP)
                         </div>
-                        <div
-                          className="text-3xl font-black text-white mb-1"
-                          style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                        >
-                          {formatRupiah(program.achievementRp)}
-                        </div>
-                        <div className="text-[10px] text-slate-500 uppercase mb-3">
-                          Budget: {formatRupiah(program.monthly_target_rp || 0)}
+                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
+                          <div
+                            className="text-[min(2rem,15cqw)] font-black text-white whitespace-nowrap leading-none mb-1"
+                            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                          >
+                            {formatRupiah(program.achievementRp)}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-3">
+                            Budget: {formatRupiah(program.monthly_target_rp || 0)}
+                          </div>
                         </div>
                         <ProgressBar pct={(program.achievementRp / (program.monthly_target_rp || 1)) * 100} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
-                        <div className="text-[10px] text-slate-500 mt-1.5">
-                          Pencapaian:{' '}
+                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
+                          <span>Pencapaian</span>
                           <span className="text-cyan-400 font-bold">{((program.achievementRp / (program.monthly_target_rp || 1)) * 100).toFixed(1)}%</span>
                         </div>
                       </Card>
@@ -489,22 +493,24 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
 
                     {/* Legacy Users */}
                     {(program.monthly_target_user || 0) > 0 && (
-                      <Card className="p-5" accentColor="#00ff9d">
+                      <Card className="p-5 flex flex-col justify-between" accentColor="#00ff9d">
                         <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">
                           User Acquisition
                         </div>
-                        <div
-                          className="text-3xl font-black mb-1"
-                          style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
-                        >
-                          {program.achievementUser.toLocaleString()}
-                        </div>
-                        <div className="text-[10px] text-slate-500 uppercase mb-3">
-                          Goal: {(program.monthly_target_user || 0).toLocaleString()} user
+                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
+                          <div
+                            className="text-[min(2rem,15cqw)] font-black whitespace-nowrap leading-none mb-1"
+                            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
+                          >
+                            {program.achievementUser.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase mb-3">
+                            Goal: {(program.monthly_target_user || 0).toLocaleString()} user
+                          </div>
                         </div>
                         <ProgressBar pct={(program.achievementUser / (program.monthly_target_user || 1)) * 100} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
-                        <div className="text-[10px] text-slate-500 mt-1.5">
-                          Pencapaian:{' '}
+                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
+                          <span>Pencapaian</span>
                           <span className="text-emerald-400 font-bold">{((program.achievementUser / (program.monthly_target_user || 1)) * 100).toFixed(1)}%</span>
                         </div>
                       </Card>
