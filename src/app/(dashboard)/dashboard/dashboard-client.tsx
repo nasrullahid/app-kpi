@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import { ProgramWithRelations } from './actions'
-import { Database } from '@/types/database'
 import { calculateProgramHealth } from '@/lib/dashboard-calculator'
 import { formatRupiah, cn } from '@/lib/utils'
 import { formatMetricValue } from '@/lib/formula-evaluator'
@@ -16,22 +15,12 @@ import {
 } from 'lucide-react'
 import { getPreviousPeriodLabel } from '@/lib/utils'
 
-type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
-type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
-type Period = Database['public']['Tables']['periods']['Row']
-
 import { DashboardSummary } from '@/lib/dashboard-service'
 
 interface OverviewClientProps {
   programs: ProgramWithRelations[]
-  dailyInputs: DailyInput[]
-  activePeriod: Period
-  metricValues: MetricValue[]
   profiles: { id: string; name: string }[]
-  prorationFactor: number
   summary: DashboardSummary
-  previousMetricValues?: MetricValue[]
-  previousDailyInputs?: DailyInput[]
   previousSummary?: DashboardSummary
   isCustomDateRange?: boolean
   startDate?: string
@@ -262,8 +251,6 @@ function ProgramCard({ program, health, profiles }: {
 // ── Main Component ────────────────────────────────────────────────────────────
 export function OverviewClient({
   programs,
-  activePeriod,
-  metricValues,
   profiles,
   summary,
   previousSummary,
@@ -280,7 +267,6 @@ export function OverviewClient({
   // Process data from summary
   const programHealths = summary.programHealths
   const globalKPIs = summary.globalKPIs
-  const overallHealth = summary.overallHealth
 
   const prevGlobalKPIs = previousSummary?.globalKPIs || null
   const healthGrowth = (prevGlobalKPIs && prevGlobalKPIs.avgHealth > 0)

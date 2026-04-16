@@ -58,15 +58,9 @@ export default async function DashboardPage({
         <Suspense fallback={<div className="h-96 w-full animate-pulse bg-slate-100 rounded-2xl" />}>
           <OverviewClient
             programs={data.programs}
-            dailyInputs={data.dailyInputs}
-            activePeriod={data.activePeriod}
-            metricValues={data.metricValues}
             profiles={data.profiles}
-            prorationFactor={data.prorationFactor}
             summary={data.summary}
             previousSummary={data.previousSummary}
-            previousMetricValues={data.previousMetricValues}
-            previousDailyInputs={data.previousDailyInputs}
             isCustomDateRange={data.isCustomDateRange}
             startDate={searchParams.startDate}
             endDate={searchParams.endDate}
