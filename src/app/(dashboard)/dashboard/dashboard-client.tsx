@@ -127,7 +127,7 @@ function ProgramCard({ program, health, profiles }: {
   const evaluatedMetrics = health.calculatedMetrics || {}
 
   const defs = program.program_metric_definitions || []
-  let primaryMetrics = defs.filter(m => m.is_primary && m.is_target_metric)
+  const primaryMetrics = defs.filter(m => m.is_primary && m.is_target_metric)
   const secondaryMetrics = defs.filter(m => !m.is_primary)
 
   // Synthetic primary metrics for legacy programs if no custom primary metrics exist
@@ -142,7 +142,7 @@ function ProgramCard({ program, health, profiles }: {
         label: 'Omzet',
         data_type: 'currency',
         unit_label: 'Rp'
-      } as any)
+      } as unknown as Database['public']['Tables']['program_metric_definitions']['Row'])
     }
     if (hasLegacyUser) {
       primaryMetrics.push({
@@ -151,7 +151,7 @@ function ProgramCard({ program, health, profiles }: {
         label: 'Closing',
         data_type: 'integer',
         unit_label: 'user'
-      } as any)
+      } as unknown as Database['public']['Tables']['program_metric_definitions']['Row'])
     }
   }
 

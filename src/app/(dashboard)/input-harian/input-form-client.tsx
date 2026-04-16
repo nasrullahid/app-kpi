@@ -209,8 +209,8 @@ export function InputFormClient({
       if (targetType === 'quantitative' || targetType === 'hybrid') {
         const rp = formData.get('achievement_rp')
         const user = formData.get('achievement_user')
-        if (rp !== null && rp !== '') (payload as any).achievement_rp = Number(rp)
-        if (user !== null && user !== '') (payload as any).achievement_user = Number(user)
+        if (rp !== null && rp !== '') payload.achievement_rp = Number(rp)
+        if (user !== null && user !== '') payload.achievement_user = Number(user)
       }
 
       let res;
