@@ -353,7 +353,7 @@ export function ProgramClient({
                           className="p-2 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg border border-transparent hover:border-slate-200 shadow-none hover:shadow-sm transition-all"
                           title="Edit Program"
                         >
-                          <PenLine className="h-4 w-4 rotate-45" />
+                          <PenLine className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(prog.id)}
