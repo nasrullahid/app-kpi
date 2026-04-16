@@ -210,7 +210,7 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         target_direction: 'higher_is_better',
       },
 
-      // ─── RAW INPUT: REVENUE ───────────────────────────────────────
+      // ─── RAW INPUT: REVENUE & ACQUISITION ──────────────────────────
       {
         metric_key: 'revenue',
         label: 'Revenue from Paid Traffic',
@@ -221,6 +221,19 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: 'revenue',
         unit_label: 'Rp',
         display_order: 14,
+        formula: null,
+        target_direction: 'higher_is_better',
+      },
+      {
+        metric_key: 'user_count',
+        label: 'Closing (User Baru)',
+        data_type: 'integer',
+        input_type: 'manual',
+        is_primary: true,
+        is_target_metric: true,
+        metric_group: 'user_acquisition',
+        unit_label: 'user',
+        display_order: 15,
         formula: null,
         target_direction: 'higher_is_better',
       },
@@ -600,6 +613,19 @@ export const METRIC_TEMPLATES: MetricTemplate[] = [
         metric_group: null,
         unit_label: 'Rp',
         display_order: 42,
+        target_direction: 'lower_is_better',
+      },
+      {
+        metric_key: 'cpp',
+        label: 'CPP (Cost per Closing)',
+        data_type: 'currency',
+        input_type: 'calculated',
+        formula: 'ad_spend / user_count',
+        is_primary: false,
+        is_target_metric: false,
+        metric_group: null,
+        unit_label: 'Rp',
+        display_order: 43,
         target_direction: 'lower_is_better',
       },
       {
