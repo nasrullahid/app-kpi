@@ -28,7 +28,6 @@ interface OverviewClientProps {
   profiles: { id: string; name: string }[]
   summary: DashboardSummary
   previousSummary?: DashboardSummary
-  isCustomDateRange?: boolean
   startDate?: string
   endDate?: string
   metricValues: MetricValue[]
@@ -59,6 +58,11 @@ function getBannerInfo(score: number) {
   if (score < 80)  return { text: 'Progres bagus — jangan kendur! 🎯', bg: 'bg-blue-50', border: 'border-blue-200', textCol: 'text-blue-800' }
   if (score < 100) return { text: 'Hampir sampai — satu langkah lagi! 🚀', bg: 'bg-indigo-50', border: 'border-[#EEEDFE]', textCol: 'text-[#534AB7]' }
   return { text: 'Target tercapai — luar biasa! 🏆', bg: 'bg-emerald-50', border: 'border-emerald-200', textCol: 'text-emerald-800' }
+}
+
+function calculateGrowth(current: number, previous: number): number {
+  if (!previous || previous === 0) return 0
+  return ((current - previous) / previous) * 100
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -252,7 +256,6 @@ export function OverviewClient({
   profiles,
   summary,
   previousSummary,
-  isCustomDateRange,
   startDate,
   endDate,
   metricValues
@@ -343,15 +346,6 @@ export function OverviewClient({
     { key: 'leads', label: 'Leads' },
   ]
 
-  const prevGlobalKPIs = previousSummary?.globalKPIs || null
-  const healthGrowth = (prevGlobalKPIs && prevGlobalKPIs.avgHealth > 0)
-    ? ((globalKPIs.avgHealth - prevGlobalKPIs.avgHealth) / prevGlobalKPIs.avgHealth) * 100
-    : 0
-
-  const targetGrowth = (prevGlobalKPIs && prevGlobalKPIs.targetsHit > 0)
-    ? ((globalKPIs.targetsHit - prevGlobalKPIs.targetsHit) / prevGlobalKPIs.targetsHit) * 100
-    : (prevGlobalKPIs?.targetsHit === 0 && globalKPIs.targetsHit > 0) ? 100 : 0
-
   const prevPeriodLabel = useMemo(() => getPreviousPeriodLabel(startDate, endDate), [startDate, endDate])
 
   const departments = useMemo(() => {
@@ -438,7 +432,10 @@ export function OverviewClient({
               value={`${Math.round(globalKPIs.avgHealth)}%`} 
               sub={globalKPIs.healthStatus} 
               accentColor={getStatusLabelAndColor(globalKPIs.avgHealth).accent}
-              comparison={isCustomDateRange && prevGlobalKPIs ? { value: healthGrowth, label: prevPeriodLabel } : undefined} 
+              comparison={previousSummary ? { 
+                value: calculateGrowth(globalKPIs.avgHealth, previousSummary.globalKPIs.avgHealth), 
+                label: prevPeriodLabel 
+              } : undefined} 
             />
             <KpiCard 
               icon={Layers} 
@@ -446,14 +443,21 @@ export function OverviewClient({
               value={globalKPIs.activeProgramsCount} 
               sub={`dari ${globalKPIs.totalPrograms} total`} 
               accentColor="#378ADD"
+              comparison={previousSummary ? {
+                value: calculateGrowth(globalKPIs.activeProgramsCount, previousSummary.globalKPIs.activeProgramsCount),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={Target} 
               label="Target tercapai" 
               value={globalKPIs.targetsHit} 
-              sub={`program bulan ini`} 
+              sub={`program periode ini`} 
               accentColor="#639922"
-              comparison={isCustomDateRange && prevGlobalKPIs ? { value: targetGrowth, label: prevPeriodLabel } : undefined} 
+              comparison={previousSummary ? { 
+                value: calculateGrowth(globalKPIs.targetsHit, previousSummary.globalKPIs.targetsHit), 
+                label: prevPeriodLabel 
+              } : undefined} 
             />
             <KpiCard 
               icon={CheckSquare} 
@@ -461,6 +465,10 @@ export function OverviewClient({
               value={globalKPIs.completedMilestones} 
               sub={`dari ${globalKPIs.totalMilestones} total`} 
               accentColor="#534AB7"
+              comparison={previousSummary ? {
+                value: calculateGrowth(globalKPIs.completedMilestones, previousSummary.globalKPIs.completedMilestones),
+                label: prevPeriodLabel
+              } : undefined}
             />
           </div>
 
@@ -580,29 +588,51 @@ export function OverviewClient({
               icon={Target} 
               label="Total capaian Rp" 
               value={formatRupiah(summary.aggregates.revenue?.actual || 0)} 
-              sub={`/ ${formatRupiah(summary.aggregates.revenue?.totalTarget || 0)}`} 
+              sub={summary.aggregates.revenue?.isComputed ? 'Estimasi' : 'Aktual'}
               accentColor="#639922"
+              comparison={previousSummary ? {
+                value: calculateGrowth(summary.aggregates.revenue?.actual || 0, previousSummary.aggregates.revenue?.actual || 0),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={TrendingUp} 
               label="Sisa target Rp" 
               value={formatRupiah(Math.max(0, (summary.aggregates.revenue?.totalTarget || 0) - (summary.aggregates.revenue?.actual || 0)))} 
-              sub="jumlah sisa bulan ini" 
+              sub="jumlah sisa periode ini" 
               accentColor="#534AB7"
+              comparison={previousSummary ? {
+                value: calculateGrowth(
+                  Math.max(0, (summary.aggregates.revenue?.totalTarget || 0) - (summary.aggregates.revenue?.actual || 0)),
+                  Math.max(0, (previousSummary.aggregates.revenue?.totalTarget || 0) - (previousSummary.aggregates.revenue?.actual || 0))
+                ),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={Layers} 
               label="Total capaian user" 
               value={summary.aggregates.user_acquisition?.actual || 0} 
-              sub={`/ ${summary.aggregates.user_acquisition?.totalTarget || 0} user`} 
+              sub="User"
               accentColor="#378ADD"
+              comparison={previousSummary ? {
+                value: calculateGrowth(summary.aggregates.user_acquisition?.actual || 0, previousSummary.aggregates.user_acquisition?.actual || 0),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={CheckSquare} 
               label="Sisa target user" 
               value={Math.max(0, (summary.aggregates.user_acquisition?.totalTarget || 0) - (summary.aggregates.user_acquisition?.actual || 0))} 
-              sub="user yang harus dikejar" 
+              sub="user sisa target" 
               accentColor="#EAB308"
+              comparison={previousSummary ? {
+                value: calculateGrowth(
+                  Math.max(0, (summary.aggregates.user_acquisition?.totalTarget || 0) - (summary.aggregates.user_acquisition?.actual || 0)),
+                  Math.max(0, (previousSummary.aggregates.user_acquisition?.totalTarget || 0) - (previousSummary.aggregates.user_acquisition?.actual || 0))
+                ),
+                label: prevPeriodLabel
+              } : undefined}
             />
              <KpiCard 
               icon={HeartPulse} 
@@ -610,6 +640,10 @@ export function OverviewClient({
               value={`${Math.round(summary.overallHealth)}%`} 
               sub={summary.globalKPIs.healthStatus}
               accentColor={getStatusLabelAndColor(summary.overallHealth).accent}
+              comparison={previousSummary ? {
+                value: calculateGrowth(summary.overallHealth, previousSummary.overallHealth),
+                label: prevPeriodLabel
+              } : undefined}
             />
           </div>
 
@@ -721,8 +755,12 @@ export function OverviewClient({
               icon={Layers} 
               label="Total ads spent" 
               value={formatRupiah(adsAggregate.totalAdsSpent)} 
-              sub="bulan berjalan"
+              sub="periode ini"
               accentColor="#378ADD" 
+              comparison={previousSummary ? {
+                value: calculateGrowth(adsAggregate.totalAdsSpent, previousSummary.adsMetrics.totalAdsSpent),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={Target} 
@@ -730,6 +768,10 @@ export function OverviewClient({
               value={adsAggregate.totalGoals} 
               sub="jumlah closing" 
               accentColor="#639922" 
+              comparison={previousSummary ? {
+                value: calculateGrowth(adsAggregate.totalGoals, previousSummary.adsMetrics.totalGoals),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={HeartPulse} 
@@ -737,6 +779,10 @@ export function OverviewClient({
               value={`${adsAggregate.avgRoas.toFixed(2)}x`} 
               sub={adsAggregate.avgRoas >= 1 ? "Profitable (>1x)" : "Ditinjau (<1x)"}
               accentColor="#534AB7" 
+              comparison={previousSummary ? {
+                value: calculateGrowth(adsAggregate.avgRoas, previousSummary.adsMetrics.avgRoas),
+                label: prevPeriodLabel
+              } : undefined}
             />
             <KpiCard 
               icon={CheckSquare} 
@@ -744,6 +790,10 @@ export function OverviewClient({
               value={formatRupiah(adsAggregate.avgCpp)} 
               sub="biaya per goal"
               accentColor={adsAggregate.avgCpp > 60000 ? "#E24B4A" : "#639922"} 
+              comparison={previousSummary ? {
+                value: calculateGrowth(adsAggregate.avgCpp, previousSummary.adsMetrics.avgCpp),
+                label: prevPeriodLabel
+              } : undefined}
             />
           </div>
 

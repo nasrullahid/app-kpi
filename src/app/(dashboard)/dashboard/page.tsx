@@ -61,7 +61,6 @@ export default async function DashboardPage({
             profiles={data.profiles}
             summary={data.summary}
             previousSummary={data.previousSummary}
-            isCustomDateRange={data.isCustomDateRange}
             startDate={searchParams.startDate}
             endDate={searchParams.endDate}
             metricValues={data.metricValues}
