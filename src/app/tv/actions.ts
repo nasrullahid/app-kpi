@@ -120,38 +120,86 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       return getPriority(a) - getPriority(b)
     })
 
-    const unifiedPrimaryMetrics: UnifiedMetric[] = primaryDefs.map(m => ({
-      key: m.metric_key,
-      label: m.label,
-      achieved: ph.calculatedMetrics?.[m.metric_key] || 0,
-      target: ph.effectiveTargets?.[m.metric_key] || 0,
-      unit: m.unit_label || '',
-      dataType: m.data_type
-    }))
+    // --- Group and Sum Unified Metrics (Summing by Revenue/Acquisition) ---
+    const unifiedMetricsMap = new Map<string, UnifiedMetric>()
+    
+    primaryDefs.forEach(m => {
+      const k = m.metric_key?.toLowerCase()
+      const g = m.metric_group || 
+                (['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic'].includes(k) ? 'revenue' : 
+                 (['user_count', 'closing', 'leads_converted', 'pembelian'].includes(k) || k.includes('closing')) ? 'user_acquisition' : null)
+      
+      if (!g) {
+        // Standalone primary metric
+        const key = m.metric_key
+        unifiedMetricsMap.set(key, {
+          key,
+          label: m.label,
+          achieved: ph.calculatedMetrics?.[key] || 0,
+          target: m.data_type === 'currency' ? (m.monthly_target || 0) : Math.round(m.monthly_target || 0),
+          unit: m.unit_label || '',
+          dataType: m.data_type
+        })
+        return
+      }
 
-    // Fallback for legacy programs without primary metric definitions
-    if (unifiedPrimaryMetrics.length === 0 && !ph.isQualitativeOnly) {
-      if ((prog.monthly_target_rp || 0) > 0) {
-        unifiedPrimaryMetrics.push({
+      const existing = unifiedMetricsMap.get(g)
+      const achieved = ph.calculatedMetrics?.[m.metric_key] || 0
+      const absoluteTarget = m.monthly_target || 0
+
+      if (existing) {
+        existing.achieved += achieved
+        existing.target += (m.data_type === 'currency' ? absoluteTarget : Math.round(absoluteTarget))
+      } else {
+        unifiedMetricsMap.set(g, {
+          key: g, // Use group as key for easier sum lookup in components
+          label: g === 'revenue' ? 'Total Omzet' : g === 'user_acquisition' ? 'Total Closing' : m.label,
+          achieved,
+          target: m.data_type === 'currency' ? absoluteTarget : Math.round(absoluteTarget),
+          unit: m.unit_label || '',
+          dataType: m.data_type
+        })
+      }
+    })
+
+    // --- Enhanced legacy target merging ---
+    // Merge Revenue
+    const existingRev = unifiedMetricsMap.get('revenue')
+    const legacyRevTarget = prog.monthly_target_rp || 0
+    if (legacyRevTarget > 0 && !ph.isQualitativeOnly) {
+      if (!existingRev) {
+        unifiedMetricsMap.set('revenue', {
           key: 'revenue',
           label: 'Omzet',
           achieved: ph.calculatedMetrics?.['revenue'] || 0,
-          target: ph.effectiveTargets?.['revenue'] || prog.monthly_target_rp || 0,
+          target: legacyRevTarget,
           unit: 'Rp',
           dataType: 'currency'
         })
+      } else if (existingRev.target === 0) {
+        existingRev.target = legacyRevTarget
       }
-      if ((prog.monthly_target_user || 0) > 0) {
-        unifiedPrimaryMetrics.push({
-          key: 'user_count',
-          label: 'User',
+    }
+    
+    // Merge User Acquisition
+    const existingAcq = unifiedMetricsMap.get('user_acquisition')
+    const legacyUserTarget = prog.monthly_target_user || 0
+    if (legacyUserTarget > 0 && !ph.isQualitativeOnly) {
+      if (!existingAcq) {
+        unifiedMetricsMap.set('user_acquisition', {
+          key: 'user_acquisition',
+          label: 'Closing',
           achieved: ph.calculatedMetrics?.['user_count'] || 0,
-          target: ph.effectiveTargets?.['user_count'] || prog.monthly_target_user || 0,
+          target: legacyUserTarget,
           unit: 'user',
           dataType: 'integer'
         })
+      } else if (existingAcq.target === 0) {
+        existingAcq.target = legacyUserTarget
       }
     }
+
+    const unifiedPrimaryMetrics = Array.from(unifiedMetricsMap.values())
     
     const totalMilestones = prog.program_milestones?.length || 0
     const completedMilestones = prog.program_milestones?.filter(ms => 

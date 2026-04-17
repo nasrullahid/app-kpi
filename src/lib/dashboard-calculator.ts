@@ -20,7 +20,8 @@ export interface ProgramHealthResult {
   totalTargetMetrics: number
   isQualitativeOnly: boolean
   calculatedMetrics?: Record<string, number | null>
-  effectiveTargets?: Record<string, number> // Stores final targets used for display
+  effectiveTargets?: Record<string, number> // Stores prorated targets for health calculation
+  absoluteTargets?: Record<string, number>  // Stores full monthly targets for UI display
 }
 
 export function getHealthStatus(score: number): ProgramHealthResult['status'] {
@@ -99,27 +100,44 @@ export function calculateProgramHealth(
       let sumPercentage = 0
       let validMetrics = 0
       const effectiveTargets: Record<string, number> = {}
+      const absoluteTargets: Record<string, number> = {}
 
+      // First, calculate absolute targets for ALL metrics
+      metrics.forEach(m => {
+        let mTarget = m.monthly_target || 0
+        if (mTarget === 0) {
+          if (m.data_type === 'currency') mTarget = program.monthly_target_rp || 0
+          else if (m.data_type === 'integer') mTarget = program.monthly_target_user || 0
+        }
+        
+        const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
+        const sumCustomTarget = vals.reduce((sum, v) => sum + (v.target_value || 0), 0)
+        
+        // If custom target list exists, use its sum (periodized) or fallback to monthly
+        const absTarget = sumCustomTarget > 0 ? sumCustomTarget / prorationFactor : mTarget
+        const isInt = m.data_type === 'integer' || m.unit_label?.toLowerCase().includes('user') || m.unit_label?.toLowerCase().includes('lead')
+        
+        absoluteTargets[m.metric_key] = isInt ? Math.round(absTarget) : absTarget
+      })
+
+      // Second, calculate health and effective targets for PRIMARY metrics
       primaryMetrics.forEach(m => {
         const sumActual = evaluatedMetrics[m.metric_key] || 0
         const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
         const sumCustomTarget = vals.reduce((sum, v) => sum + (v.target_value || 0), 0)
 
-        let monthlyTarget = m.monthly_target || 0
-        if (monthlyTarget === 0) {
-          if (m.data_type === 'currency') monthlyTarget = program.monthly_target_rp || 0
-          else if (m.data_type === 'integer') monthlyTarget = program.monthly_target_user || 0
-        }
-
         const daysInSelection = prorationFactor * workingDaysInPeriod
         const manualDaily = m.metric_key === 'revenue' ? (program.daily_target_rp || 0) : 
                             m.metric_key === 'user_count' ? (program.daily_target_user || 0) : 0
 
+        const isInteger = m.data_type === 'integer' || m.unit_label?.toLowerCase().includes('user') || m.unit_label?.toLowerCase().includes('lead')
+        
+        // Effective target used for Health Score (prorated)
         const effectiveTarget = sumCustomTarget > 0 ? sumCustomTarget : 
                                 manualDaily > 0 ? (manualDaily * daysInSelection) : 
-                                (monthlyTarget * prorationFactor)
+                                ((absoluteTargets[m.metric_key] || 0) * prorationFactor)
 
-        effectiveTargets[m.metric_key] = effectiveTarget
+        effectiveTargets[m.metric_key] = isInteger ? Math.round(effectiveTarget) : effectiveTarget
 
         if (effectiveTarget > 0) {
           let pct = (sumActual / effectiveTarget) * 100
@@ -139,7 +157,8 @@ export function calculateProgramHealth(
         totalTargetMetrics: validMetrics,
         isQualitativeOnly: false,
         calculatedMetrics: evaluatedMetrics,
-        effectiveTargets
+        effectiveTargets,
+        absoluteTargets
       }
     }
   }
@@ -183,6 +202,9 @@ export function calculateProgramHealth(
   const effectiveRp = program.daily_target_rp ? (program.daily_target_rp * daysInSelection) : (program.monthly_target_rp || 0) * prorationFactor
   const effectiveUser = program.daily_target_user ? (program.daily_target_user * daysInSelection) : (program.monthly_target_user || 0) * prorationFactor
 
+  const finalRp = Math.round(effectiveRp)
+  const finalUser = Math.round(effectiveUser)
+
   let scoreRp = 0, scoreUser = 0
   let totalValidMetrics = 0
 
@@ -199,8 +221,12 @@ export function calculateProgramHealth(
     isQualitativeOnly: false,
     calculatedMetrics: evaluatedMetrics,
     effectiveTargets: {
-      revenue: effectiveRp,
-      user_count: effectiveUser
+      revenue: finalRp,
+      user_count: finalUser
+    },
+    absoluteTargets: {
+      revenue: program.monthly_target_rp || 0,
+      user_count: program.monthly_target_user || 0
     }
   }
 }
@@ -266,6 +292,7 @@ export function aggregateByMetricGroup(
     const getProgValue = (group: string, keys: string[]) => {
       let customSum = 0
       let customTarget = 0
+      let customAbsolute = 0
       let foundCustom = false
 
       definitions.forEach(m => {
@@ -273,15 +300,20 @@ export function aggregateByMetricGroup(
         const match = m.metric_group === group || keys.includes(k)
         if (match) {
           const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
-          if (vals.length > 0) {
-            foundCustom = true
-            customSum += vals.reduce((s, v) => s + (Number(v.value) || 0), 0)
-            customTarget += vals.reduce((s, v) => s + (Number(v.target_value) || 0), 0)
+          foundCustom = true
+          customSum += vals.reduce((s, v) => s + (Number(v.value) || 0), 0)
+          customTarget += vals.reduce((s, v) => s + (Number(v.target_value) || 0), 0)
+          
+          let mTarget = m.monthly_target || 0
+          if (mTarget === 0) {
+            if (m.data_type === 'currency') mTarget = prog.monthly_target_rp || 0
+            else if (m.data_type === 'integer') mTarget = prog.monthly_target_user || 0
           }
+          customAbsolute += mTarget
         }
       })
       
-      return { actual: customSum, target: customTarget, found: foundCustom }
+      return { actual: customSum, target: customTarget, absolute: customAbsolute, found: foundCustom }
     }
 
     const rev = getProgValue('revenue', ['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic'])
@@ -290,7 +322,7 @@ export function aggregateByMetricGroup(
     const lds = getProgValue('leads', ['leads', 'lead_masuk', 'prospek', 'leads_count'])
 
     // Update global aggregates
-    const processGroup = (g: string, data: { actual: number, target: number, found: boolean }, legacyActual: number, legacyTarget: number, legacyDaily: number) => {
+    const processGroup = (g: string, data: { actual: number, target: number, absolute: number, found: boolean }, legacyActual: number, legacyTarget: number, legacyDaily: number) => {
       const daysInSelection = prorationFactor * workingDaysInPeriod
       
       // We use custom if found ANY data there, even if 0 (prioritize new system)
@@ -305,7 +337,7 @@ export function aggregateByMetricGroup(
         // If custom target is 0, use legacy target as fallback for the target value
         target = data.target > 0 ? data.target : 
                  legacyDaily > 0 ? (legacyDaily * daysInSelection) : (legacyTarget * prorationFactor)
-        totalTarget = data.target > 0 ? data.target : legacyTarget
+        totalTarget = data.absolute > 0 ? data.absolute : legacyTarget
       } else if (legacyActual > 0 || legacyTarget > 0) {
         existingGroups.add(g)
         actual = legacyActual
@@ -328,7 +360,7 @@ export function aggregateByMetricGroup(
       existingGroups.add('ad_spend')
       groupRawTotals.ad_spend.actual += spd.actual
       groupRawTotals.ad_spend.target += spd.target
-      groupRawTotals.ad_spend.totalTarget += spd.target
+      groupRawTotals.ad_spend.totalTarget += spd.absolute > 0 ? spd.absolute : spd.target
     }
     if (lds.found) {
       existingGroups.add('leads')

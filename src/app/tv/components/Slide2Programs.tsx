@@ -114,7 +114,7 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
                 </div>
                 <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
                   <div 
-                    className={cn("h-full transition-all duration-1000 rounded-full", barColors[program.health.status])}
+                    className={cn("h-full rounded-full", barColors[program.health.status])}
                     style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>

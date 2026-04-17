@@ -434,11 +434,19 @@ export function PivotTableClient({
                   {daysArray.map(day => {
                     const dateStr = buildDateString(day)
                     const input = pastInputs?.find(i => i.program_id === activeProgram.id && i.date === dateStr)
+                    const isToday = dateStr === todayStr
                     const isFuture = dateStr > todayStr
                     
                     return (
-                      <tr key={day} className={cn("hover:bg-indigo-50/50 transition-colors", isFuture && "bg-slate-50")}>
-                        <td className="px-4 py-2 sticky left-0 z-10 bg-white border-r border-slate-100 font-semibold text-slate-700 whitespace-nowrap w-24">
+                      <tr key={day} className={cn(
+                        "hover:bg-indigo-50/50 transition-colors", 
+                        isFuture && viewMode === 'actual' && "opacity-40",
+                        isToday && "bg-indigo-50/100 border-y-2 border-indigo-500/30 font-bold"
+                      )}>
+                        <td className={cn(
+                          "px-4 py-2 sticky left-0 z-10 border-r border-slate-100 font-semibold text-slate-700 whitespace-nowrap w-24",
+                          isToday ? "bg-indigo-50 text-indigo-700" : "bg-white"
+                        )}>
                           {day} {new Date(activePeriod?.year || 2024, (activePeriod?.month || 1) - 1, 1).toLocaleString('id-ID', { month: 'short' })}
                         </td>
                         {activeProgram.target_type !== 'qualitative' ? (
@@ -447,7 +455,8 @@ export function PivotTableClient({
                               <span className={cn(
                                 "font-medium", 
                                 (input?.achievement_rp || 0) >= dailyTargetRp && dailyTargetRp > 0 ? "text-emerald-600 font-bold" : 
-                                (input?.achievement_rp || 0) > 0 ? "text-indigo-600" : "text-slate-400"
+                                (input?.achievement_rp || 0) > 0 ? "text-indigo-600" : 
+                                viewMode === 'target' ? "text-indigo-600 font-bold" : "text-slate-400"
                               )}>
                                 {formatRupiah(input?.achievement_rp || 0)}
                               </span>
@@ -456,7 +465,8 @@ export function PivotTableClient({
                               <span className={cn(
                                 "font-medium", 
                                 (input?.achievement_user || 0) >= dailyTargetUser && dailyTargetUser > 0 ? "text-emerald-600 font-bold" :
-                                (input?.achievement_user || 0) > 0 ? "text-indigo-600" : "text-slate-400"
+                                (input?.achievement_user || 0) > 0 ? "text-indigo-600" : 
+                                viewMode === 'target' ? "text-indigo-600 font-bold" : "text-slate-400"
                               )}>
                                 {(input?.achievement_user || 0).toLocaleString()} user
                               </span>
@@ -580,6 +590,7 @@ export function PivotTableClient({
             <tbody className="divide-y divide-slate-100 table-fixed">
               {daysArray.map(day => {
                 const dateStr = buildDateString(day)
+                const isToday = dateStr === todayStr
                 const isFuture = dateStr > todayStr
                 const rowEvaluated = getEvaluatedRowValues(dateStr)
                 
@@ -587,8 +598,16 @@ export function PivotTableClient({
                 const hasData = metrics.some(m => m.input_type === 'manual' && localValues[`${dateStr}_${m.id}`] !== null && localValues[`${dateStr}_${m.id}`] !== undefined)
 
                 return (
-                  <tr key={day} className={`hover:bg-indigo-50/30 transition-colors ${isFuture ? 'opacity-40' : ''} ${!hasData ? 'bg-slate-50/50' : ''}`}>
-                    <td className="px-4 py-3 font-bold text-slate-700 sticky left-0 z-10 bg-white border-r border-slate-100 shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                  <tr key={day} className={cn(
+                    "hover:bg-indigo-50/30 transition-colors",
+                    isFuture && viewMode === 'actual' && "opacity-40",
+                    isToday && "bg-indigo-50/100 border-y-2 border-indigo-500/30 font-bold",
+                    !hasData && !isToday && !isFuture && "bg-slate-50/50"
+                  )}>
+                    <td className={cn(
+                      "px-4 py-3 font-bold sticky left-0 z-10 border-r border-slate-100 shadow-[1px_0_0_rgba(0,0,0,0.05)]",
+                      isToday ? "bg-indigo-50 text-indigo-700" : "bg-white text-slate-700"
+                    )}>
                       {day} {new Date(activePeriod!.year, activePeriod!.month - 1, day).toLocaleString('id-ID', { month: 'short' })}
                     </td>
                     
@@ -653,7 +672,9 @@ export function PivotTableClient({
                               <div className="flex items-center justify-end gap-2">
                                 {saving && <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />}
                                 <span className={cn(isCalc ? 'font-medium' : colorClass, viewMode === 'target' && !isCalc && 'text-indigo-600 font-bold')}>
-                                  {val === null || val === undefined ? <span className="text-slate-300">&mdash;</span> : formatMetricValue(val, m.data_type, m.unit_label)}
+                                  {val === null || val === undefined ? (
+                                    <span className={cn(viewMode === 'target' ? "text-indigo-400 font-black" : "text-slate-300")}>&mdash;</span>
+                                  ) : formatMetricValue(val, m.data_type, m.unit_label)}
                                 </span>
                               </div>
                             )}

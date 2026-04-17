@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ProgramPerformance, DailyInput, Milestone } from '../actions'
 import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
@@ -13,9 +13,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine
+  ReferenceLine,
+  BarChart,
+  Bar,
+  ComposedChart,
+  Line
 } from 'recharts'
-import { CheckCircle2, ClipboardList, Target, TrendingUp } from 'lucide-react'
+import { CheckCircle2, ClipboardList, Target, TrendingUp, BarChart3 } from 'lucide-react'
 
 type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
@@ -112,7 +116,7 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.07)' }}>
       <div
-        className="h-full rounded-full transition-all duration-1000"
+        className="h-full rounded-full"
         style={{ width: `${Math.min(pct, 100)}%`, background: color }}
       />
     </div>
@@ -145,22 +149,57 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
     .sort((a, b) => a.display_order - b.display_order)
   const hasCustomMetrics = tvMetrics.length > 0
 
+  // Detect Ads Program
+  const isAds = useMemo(() => {
+    return metricDefinitions.some(m => 
+      ['ad_spend', 'ads_spent', 'roas', 'cpp'].includes(m.metric_group || '') ||
+      ['ads_spent', 'ad_spend', 'roas', 'cpp'].includes(m.metric_key)
+    )
+  }, [metricDefinitions])
+
   // ── Chart data ──────────────────────────────────────────────────────────────
-  // Select the primary metric for the trend chart
   const primaryMetric = 
     tvMetrics.find(m => m.metric_group === 'revenue') || 
+    tvMetrics.find(m => m.metric_key === 'revenue') ||
     tvMetrics.find(m => m.metric_group === 'user_acquisition') ||
     tvMetrics[0]
 
-  let chartDataWithTarget: Record<string, unknown>[] = []
+  let chartData: any[] = []
   let chartMaxTarget = 0
-  let chartLabel = "Cumulative Analytics"
+  let chartLabel = isAds ? "Daily Performance (Spend vs ROAS)" : "Cumulative Analytics"
 
-  if (primaryMetric) {
+  if (isAds) {
+    // Specialized Ads Chart: Daily Spend (Bar) vs ROAS (Line)
+    const spendDef = metricDefinitions.find(m => m.metric_group === 'ad_spend' || m.metric_key === 'ads_spent')
+    const roasDef = metricDefinitions.find(m => m.metric_group === 'efficiency' || m.metric_key === 'roas')
+
+    if (spendDef) {
+      const spendValues = (metricValues || []).filter(mv => mv.metric_definition_id === spendDef.id)
+      const roasValues = roasDef ? (metricValues || []).filter(mv => mv.metric_definition_id === roasDef.id) : []
+
+      // Group by date
+      const dataMap = new Map<string, any>()
+      spendValues.forEach(sv => {
+        dataMap.set(sv.date, { 
+          date: sv.date, 
+          displayDate: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(sv.date)),
+          spend: Number(sv.value || 0),
+          roas: 0 
+        })
+      })
+
+      roasValues.forEach(rv => {
+        if (dataMap.has(rv.date)) {
+          dataMap.get(rv.date)!.roas = Number(rv.value || 0)
+        }
+      })
+
+      chartData = Array.from(dataMap.values()).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    }
+  } else if (primaryMetric) {
     chartLabel = `Tren Capaian ${primaryMetric.label}`
     chartMaxTarget = primaryMetric.monthly_target || 0
     
-    // Robust filtering for metric values (try ID match, then metric_key fallback)
     let mValues = (metricValues || []).filter(mv => mv.metric_definition_id === primaryMetric.id)
     if (mValues.length === 0) {
       mValues = (metricValues || []).filter(mv => {
@@ -172,59 +211,60 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
     const sortedMValues = [...mValues].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     let cumulative = 0
-    const rawChartData = sortedMValues.map(mv => {
+    chartData = sortedMValues.map((mv, i) => {
       cumulative += Number(mv.value || 0)
+      const targetPerDay = chartMaxTarget / 30
       return {
         date:        mv.date,
         displayDate: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(mv.date)),
         pencapaian:  cumulative,
+        targetIdeal: targetPerDay * (i + 1)
       }
     })
-
-    if (rawChartData.length > 0) {
-      const targetPerDay = chartMaxTarget / 30
-      chartDataWithTarget = rawChartData.map((d, i) => ({
-        ...d,
-        targetIdeal: targetPerDay * (i + 1),
-      }))
-    }
   } 
   
-  if (chartDataWithTarget.length === 0) {
+  if (chartData.length === 0 && !isAds) {
     // Legacy fallback using inputs
     const sortedInputs = [...inputs].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     )
 
     let cumulativeRp = 0
-    const rawChartData = sortedInputs.map(input => {
+    chartMaxTarget = program.monthly_target_rp || 0
+    const targetPerDay = chartMaxTarget / 30
+    
+    chartData = sortedInputs.map((input, i) => {
       cumulativeRp += Number(input.achievement_rp || 0)
       return {
         date:        input.date,
         displayDate: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(input.date)),
         pencapaian:  cumulativeRp,
+        targetIdeal: targetPerDay * (i + 1)
       }
     })
-
-    chartMaxTarget = program.monthly_target_rp || 0
-    const targetPerDay = chartMaxTarget / 30
-    chartDataWithTarget = rawChartData.map((d, i) => ({
-      ...d,
-      targetIdeal: targetPerDay * (i + 1),
-    }))
   }
 
-  // ── Derived values from Unified Metrics ─────────────────────────────────────
-  const revenueMetric = program.unifiedPrimaryMetrics.find(m => m.key === 'revenue')
-  const userAcqMetric = program.unifiedPrimaryMetrics.find(m => m.key === 'user_count' || m.key === 'user_acquisition')
+  // ── Robust Unified Metric Lookup ───────────────────────────────────────────
+  // Summing metrics for accuracy (in case they weren't summed in actions.ts)
+  const achievementRp = program.unifiedPrimaryMetrics
+    .filter(m => ['revenue', 'omzet', 'revenue_target'].includes(m.key.toLowerCase()))
+    .reduce((s, m) => s + m.achieved, 0)
+  
+  const targetRp = program.unifiedPrimaryMetrics
+    .filter(m => ['revenue', 'omzet', 'revenue_target'].includes(m.key.toLowerCase()))
+    .reduce((s, m) => s + m.target, 0) || program.monthly_target_rp || 0
+    
+  const gapRp = Math.round(Math.max(0, targetRp - achievementRp))
 
-  const achievementRp = revenueMetric?.achieved || 0
-  const targetRp = revenueMetric?.target || 0
-  const gapRp = Math.max(0, targetRp - achievementRp)
-
-  const achievementUser = userAcqMetric?.achieved || 0
-  const targetUserTotal = userAcqMetric?.target || 0
-  const gapUser = Math.max(0, targetUserTotal - achievementUser)
+  const achievementUser = program.unifiedPrimaryMetrics
+    .filter(m => ['user_count', 'user_acquisition', 'closing', 'leads'].includes(m.key.toLowerCase()))
+    .reduce((s, m) => s + m.achieved, 0)
+    
+  const targetUserTotal = program.unifiedPrimaryMetrics
+    .filter(m => ['user_count', 'user_acquisition', 'closing', 'leads'].includes(m.key.toLowerCase()))
+    .reduce((s, m) => s + m.target, 0) || program.monthly_target_user || 0
+    
+  const gapUser = Math.round(Math.max(0, targetUserTotal - achievementUser))
 
   const motivationalMessage =
     program.health.healthScore >= 100
@@ -260,214 +300,110 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
         `,
       }}
     >
-      {/* ── Scanline texture ── */}
-      <div
-        className="absolute inset-0 pointer-events-none z-0"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
-        }}
-      />
-      {/* ── Grid bg ── */}
-      <div
-        className="absolute inset-0 pointer-events-none z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(0,150,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,150,255,0.03) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
+      {/* ── Textures ── */}
+      <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)' }} />
+      <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: 'linear-gradient(rgba(0,150,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,150,255,0.03) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
 
-      {/* ════════════════════════════════════════════════════════════════
-          HEADER
-      ════════════════════════════════════════════════════════════════ */}
-      <header
-        className="relative z-10 flex items-center gap-6 px-10 py-4 border-b shrink-0"
-        style={{ borderColor: 'rgba(0,200,255,0.12)', background: 'rgba(8,15,28,0.9)' }}
-      >
-        {/* Left: badges + title + PIC */}
+      {/* ── HEADER ── */}
+      <header className="relative z-10 flex items-center gap-6 px-10 py-4 border-b shrink-0" style={{ borderColor: 'rgba(0,200,255,0.12)', background: 'rgba(8,15,28,0.9)' }}>
         <div className="flex flex-col gap-2 flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                'px-4 py-1.5 rounded-lg border text-xs font-black uppercase tracking-widest shrink-0',
-                statusTheme[program.health.status] ?? 'text-slate-400 border-slate-700 bg-slate-800/40'
-              )}
-            >
+            <span className={cn('px-4 py-1.5 rounded-lg border text-xs font-black uppercase tracking-widest shrink-0', statusTheme[program.health.status] ?? 'text-slate-400 border-slate-700 bg-slate-800/40')}>
               {program.health.status}
             </span>
             <span className="text-xs font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/5 px-4 py-1.5 rounded-lg border border-indigo-500/20 shrink-0">
               {isHybrid ? 'Misi & Angka' : isQualitative ? 'Fokus Misi' : 'Target Kuantitas'}
             </span>
           </div>
-
-          <h1
-            className="text-5xl font-black uppercase tracking-tight leading-none text-white truncate"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-          >
+          <h1 className="text-5xl font-black uppercase tracking-tight leading-none text-white truncate" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
             {program.name}
           </h1>
-
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] shrink-0">
-              Kolaborasi Tim (PIC)
-            </span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] shrink-0">Kolaborasi Tim (PIC)</span>
             <div className="flex -space-x-2">
               {program.team.map((m, i) => (
-                <div
-                  key={i}
-                  title={m.name}
-                  className="h-8 w-8 rounded-full bg-indigo-700 flex items-center justify-center text-[10px] font-black text-white border-2"
-                  style={{
-                    borderColor: '#04090f',
-                    boxShadow: '0 0 10px rgba(0,212,255,0.2)',
-                    outline: '1px solid rgba(0,212,255,0.4)',
-                  }}
-                >
+                <div key={i} title={m.name} className="h-8 w-8 rounded-full bg-indigo-700 flex items-center justify-center text-[10px] font-black text-white border-2" style={{ borderColor: '#04090f', boxShadow: '0 0 10px rgba(0,212,255,0.2)', outline: '1px solid rgba(0,212,255,0.4)' }}>
                   {m.name.substring(0, 2).toUpperCase()}
                 </div>
               ))}
             </div>
-            <span className="text-sm font-bold text-slate-200 uppercase truncate max-w-xs">
-              {program.team.map(m => m.name).join(' • ')}
-            </span>
           </div>
         </div>
 
-        {/* Center: live clock */}
-        <div
-          className="flex flex-col items-center px-8 border-x shrink-0"
-          style={{ borderColor: 'rgba(0,200,255,0.12)' }}
-        >
-          <div
-            className="text-3xl font-black tracking-wider"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ffcc44' }}
-          >
-            {time || '--:--:--'}
-          </div>
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1 text-center max-w-[200px]">
-            {dateStr}
-          </div>
+        <div className="flex flex-col items-center px-8 border-x shrink-0" style={{ borderColor: 'rgba(0,200,255,0.12)' }}>
+          <div className="text-3xl font-black tracking-wider" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ffcc44' }}>{time || '--:--:--'}</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1 text-center max-w-[200px]">{dateStr}</div>
         </div>
 
-        {/* Right: yield % */}
         <div className="flex flex-col items-end shrink-0">
-          <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] mb-1">
-            Yield Performance
-          </div>
-          <div
-            className="text-7xl font-black leading-none tracking-tighter"
-            style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              color: isQualitative ? '#a78bfa' : '#ffffff',
-            }}
-          >
-            {program.health.healthScore.toFixed(1)}
-            <span className="text-3xl" style={{ color: '#64748b' }}>%</span>
+          <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] mb-1">Yield Performance</div>
+          <div className="text-7xl font-black leading-none tracking-tighter" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isQualitative ? '#a78bfa' : '#ffffff' }}>
+            {program.health.healthScore.toFixed(1)}<span className="text-3xl" style={{ color: '#64748b' }}>%</span>
           </div>
         </div>
       </header>
 
-      {/* ════════════════════════════════════════════════════════════════
-          MAIN
-      ════════════════════════════════════════════════════════════════ */}
-      <main
-        className="relative z-10 flex-1 grid gap-4 px-8 py-4 overflow-hidden"
-        style={{ gridTemplateColumns: '1fr 1.8fr 1fr' }}
-      >
-        {/* ── LEFT: Checklist Misi ─────────────────────────────────── */}
+      {/* ── MAIN ── */}
+      <main className="relative z-10 flex-1 grid gap-4 px-8 py-4 overflow-hidden" style={{ gridTemplateColumns: '1fr 2.2fr 0.8fr' }}>
+        {/* LEFT: Checklist */}
         <Card className="p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <h3 className="text-xs font-black text-cyan-400 uppercase tracking-[0.2em] flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Checklist Misi
+              <ClipboardList className="h-4 w-4" /> Checklist Misi
             </h3>
-            <span className="text-[10px] text-slate-500 italic">Unique & Persistent</span>
           </div>
-
           <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
             {!program.program_milestones || program.program_milestones.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center opacity-25 gap-4">
                 <Target className="h-16 w-16 text-cyan-500" />
-                <p className="text-sm font-bold uppercase tracking-widest text-center">
-                  Belum ada<br />Milestone terdaftar
-                </p>
+                <p className="text-sm font-bold uppercase tracking-widest text-center">Belum ada<br />Milestone terdaftar</p>
               </div>
             ) : (
               program.program_milestones.map((ms: Milestone, i: number) => (
-                <div
-                  key={i}
-                  className="rounded-xl p-4 flex items-center gap-4 border"
-                  style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(0,200,255,0.08)' }}
-                >
-                  <div
-                    className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-sm font-black"
-                    style={{
-                      background: 'rgba(0,150,255,0.1)',
-                      color: '#00d4ff',
-                      border: '1px solid rgba(0,200,255,0.2)',
-                    }}
-                  >
-                    {i + 1}
-                  </div>
+                <div key={i} className="rounded-xl p-4 flex items-center gap-4 border" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(0,200,255,0.08)' }}>
+                  <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-sm font-black" style={{ background: 'rgba(0,150,255,0.1)', color: '#00d4ff', border: '1px solid rgba(0,200,255,0.2)' }}>{i + 1}</div>
                   <p className="text-base font-bold text-slate-100 leading-snug">{ms.title}</p>
                 </div>
               ))
             )}
           </div>
-
-          <div
-            className="mt-5 pt-5 border-t shrink-0"
-            style={{ borderColor: 'rgba(0,200,255,0.1)' }}
-          >
-            <p
-              className="text-sm text-cyan-300/60 font-medium italic leading-relaxed border-l-2 pl-3"
-              style={{ borderColor: 'rgba(0,180,255,0.3)' }}
-            >
+          <div className="mt-5 pt-5 border-t shrink-0" style={{ borderColor: 'rgba(0,200,255,0.1)' }}>
+            <p className="text-sm text-cyan-300/60 font-medium italic leading-relaxed border-l-2 pl-3" style={{ borderColor: 'rgba(0,180,255,0.3)' }}>
               &quot;{program.qualitative_description || 'Fokus pada pencapaian target program harian.'}&quot;
             </p>
           </div>
         </Card>
 
-        {/* ── CENTER ──────────────────────────────────────────────── */}
+        {/* CENTER: Metrics + Chart */}
         <div className="flex flex-col gap-4 overflow-hidden min-h-0">
           {!isQualitative ? (
             <>
-              {/* Metric cards — custom or legacy */}
-              <div className={`grid gap-4 shrink-0 ${tvMetrics.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {hasCustomMetrics ? (
-                  tvMetrics.map(metric => {
-                    const achieved = program.health.calculatedMetrics?.[metric.metric_key] || 0
-                    const target = program.health.effectiveTargets?.[metric.metric_key] || (metric.monthly_target || 0)
+              {/* Metric Row */}
+              <div className={`grid gap-4 shrink-0 ${hasCustomMetrics ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
+                {program.unifiedPrimaryMetrics.length > 0 ? (
+                  program.unifiedPrimaryMetrics.map(metric => {
+                    const achieved = metric.achieved
+                    const target = metric.target
                     const pct = target > 0 ? (achieved / target) * 100 : 0
-                    const isLower = metric.target_direction === 'lower_is_better'
+                    
+                    // Detect if this is a "lower is better" metric from definitions
+                    const originalDef = metricDefinitions.find(d => d.metric_key === metric.key)
+                    const isLower = originalDef?.target_direction === 'lower_is_better'
 
                     return (
-                      <Card key={metric.id} className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
-                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
-                          {metric.label}
-                        </div>
-                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
-                          <div
-                            className="text-[min(2rem,15cqw)] font-black text-white whitespace-nowrap leading-none mb-1"
-                            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                          >
-                            {metric.data_type === 'currency'
-                              ? formatRupiah(achieved)
-                              : formatMetricValue(achieved, metric.data_type, metric.unit_label)}
+                      <Card key={metric.key} className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
+                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">{metric.label}</div>
+                        <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
+                          <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                            {formatMetricValue(achieved, metric.dataType as any, metric.unit)}
                           </div>
-                          <div className="text-[10px] text-slate-500 uppercase mb-3">
-                            Target: {metric.data_type === 'currency'
-                              ? formatRupiah(target)
-                              : formatMetricValue(target, metric.data_type, metric.unit_label)}
+                          <div className="text-[10px] text-slate-500 uppercase mb-2">
+                            Target: {formatMetricValue(target, metric.dataType as any, metric.unit)}
                           </div>
                         </div>
-                        <ProgressBar
-                          pct={isLower ? Math.max(0, 100 - pct + 100) : pct}
-                          color="linear-gradient(90deg, #00aacc, #00d4ff)"
-                        />
-                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
-                          <span>{isLower ? '↓ Lower better' : 'Pencapaian'}</span>
+                        <ProgressBar pct={isLower ? Math.max(0, 100 - pct + 100) : pct} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
+                        <div className="text-[9px] text-slate-500 mt-1 flex justify-between">
+                          <span>{isLower ? '↓ Lower better' : 'Progress'}</span>
                           <span className="text-cyan-400 font-bold">{pct.toFixed(1)}%</span>
                         </div>
                       </Card>
@@ -475,311 +411,161 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                   })
                 ) : (
                   <>
-                    {/* Legacy Capital */}
-                    {targetRp > 0 && (
-                      <Card className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
-                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
-                          Target Capital (RP)
-                        </div>
-                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
-                          <div
-                            className="text-[min(2rem,15cqw)] font-black text-white whitespace-nowrap leading-none mb-1"
-                            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                          >
-                            {formatRupiah(achievementRp)}
-                          </div>
-                          <div className="text-[10px] text-slate-500 uppercase mb-3">
-                            Budget: {formatRupiah(targetRp)}
-                          </div>
-                        </div>
-                        <ProgressBar pct={(achievementRp / (targetRp || 1)) * 100} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
-                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
-                          <span>Pencapaian</span>
-                          <span className="text-cyan-400 font-bold">{((achievementRp / (targetRp || 1)) * 100).toFixed(1)}%</span>
-                        </div>
-                      </Card>
-                    )}
-
-                    {/* Legacy Users */}
-                    {targetUserTotal > 0 && (
-                      <Card className="p-5 flex flex-col justify-between" accentColor="#00ff9d">
-                        <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">
-                          User Acquisition
-                        </div>
-                        <div className="flex flex-col gap-1 w-full" style={{ containerType: 'inline-size' }}>
-                          <div
-                            className="text-[min(2rem,15cqw)] font-black whitespace-nowrap leading-none mb-1"
-                            style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
-                          >
-                            {achievementUser.toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-slate-500 uppercase mb-3">
-                            Goal: {targetUserTotal.toLocaleString()} user
-                          </div>
-                        </div>
-                        <ProgressBar pct={(achievementUser / (targetUserTotal || 1)) * 100} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
-                        <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
-                          <span>Pencapaian</span>
-                          <span className="text-emerald-400 font-bold">{((achievementUser / (targetUserTotal || 1)) * 100).toFixed(1)}%</span>
-                        </div>
-                      </Card>
-                    )}
+                    <Card className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
+                      <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">Target Capaian (RP)</div>
+                      <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
+                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{formatRupiah(achievementRp)}</div>
+                         <div className="text-[10px] text-slate-500 uppercase mb-2">Budget: {formatRupiah(targetRp)}</div>
+                      </div>
+                      <ProgressBar pct={targetRp > 0 ? (achievementRp / targetRp) * 100 : 0} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
+                      <div className="text-[9px] text-slate-500 mt-1 flex justify-between">
+                         <span>Omzet Realisasi</span>
+                         <span className="text-cyan-400 font-bold">{targetRp > 0 ? ((achievementRp / targetRp) * 100).toFixed(1) : '0'}%</span>
+                      </div>
+                    </Card>
+                    <Card className="p-5 flex flex-col justify-between" accentColor="#00ff9d">
+                      <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">User Acquisition</div>
+                      <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
+                         <div className="text-[min(2rem,14cqw)] font-black whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}>{achievementUser.toLocaleString()}</div>
+                         <div className="text-[10px] text-slate-500 uppercase mb-2">Goal: {targetUserTotal.toLocaleString()} user</div>
+                      </div>
+                      <ProgressBar pct={targetUserTotal > 0 ? (achievementUser / targetUserTotal) * 100 : 0} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
+                      <div className="text-[9px] text-slate-500 mt-1 flex justify-between">
+                         <span>Pencapaian</span>
+                         <span className="text-emerald-400 font-bold">{targetUserTotal > 0 ? ((achievementUser / targetUserTotal) * 100).toFixed(1) : '0'}%</span>
+                      </div>
+                    </Card>
                   </>
                 )}
               </div>
 
-              {/* Trend chart */}
-              <Card className="p-6 flex flex-col flex-1 min-h-0" accentColor="#ffcc44">
+              {/* Chart Section */}
+              <Card className="p-6 flex flex-col flex-1 min-h-0" accentColor={isAds ? "#f43f5e" : "#ffcc44"}>
                 <div className="flex items-center justify-between mb-4 shrink-0">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-amber-400" />
+                    {isAds ? <BarChart3 className="h-4 w-4 text-rose-500" /> : <TrendingUp className="h-4 w-4 text-amber-400" />}
                     {chartLabel}
                   </h3>
                   <div className="flex gap-4">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                      <div className="h-2 w-2 rounded-full bg-cyan-400" />
-                      REALISASI
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                      <div
-                        className="w-4"
-                        style={{ height: 0, borderTop: '2px dashed #475569' }}
-                      />
-                      IDEAL
-                    </div>
+                    {isAds ? (
+                      <>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><div className="h-2 w-2 rounded-sm bg-rose-500" /> SPEND</div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><div className="h-0.5 w-3 bg-cyan-400" /> ROAS</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><div className="h-2 w-2 rounded-full bg-cyan-400" /> REALISASI</div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><div className="w-4" style={{ height: 0, borderTop: '2px dashed #475569' }} /> IDEAL</div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex-1 w-full min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={chartDataWithTarget}
-                      margin={{ top: 24, right: 20, left: 10, bottom: 10 }}
-                    >
-                      <defs>
-                        <linearGradient id="gradAchTV" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#00d4ff" stopOpacity={0.22} />
-                          <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="rgba(0,150,255,0.06)"
-                      />
-                      <XAxis dataKey="displayDate" hide />
-                      <YAxis
-                        hide
-                        domain={[0, (dataMax: number) =>
-                          Math.max(dataMax, chartMaxTarget)
-                        ]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#0d1a2e',
-                          borderColor: 'rgba(0,212,255,0.3)',
-                          borderRadius: '12px',
-                        }}
-                        itemStyle={{ color: '#dff0ff', fontWeight: 700 }}
-                        labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
-                      />
-
-                      {/* Realisasi */}
-                      <Area
-                        type="monotone"
-                        dataKey="pencapaian"
-                        stroke="#00d4ff"
-                        strokeWidth={4}
-                        fill="url(#gradAchTV)"
-                        isAnimationActive={false}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        dot={(props: any) => {
-                          const { cx, cy, payload, index } = props
-                          const v = Number(payload.pencapaian)
-                          if (!v) return (
-                            <circle key={index} cx={cx} cy={cy} r={3}
-                              fill="#00d4ff" stroke="#04090f" strokeWidth={1} />
-                          )
+                  {isAds ? (
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                      <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+                        <XAxis dataKey="displayDate" hide />
+                        <YAxis yAxisId="left" hide />
+                        <YAxis yAxisId="right" orientation="right" hide />
+                        <Tooltip contentStyle={{ backgroundColor: '#0d1a2e', borderColor: 'rgba(255,100,255,0.2)', borderRadius: '12px' }} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                        <Bar yAxisId="left" dataKey="spend" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="roas" stroke="#22d3ee" strokeWidth={3} dot={{ r: 4, fill: '#22d3ee' }} isAnimationActive={false} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                      <AreaChart data={chartData} margin={{ top: 24, right: 20, left: 10, bottom: 10 }}>
+                        <defs>
+                          <linearGradient id="gradAchTV" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,150,255,0.06)" />
+                        <XAxis dataKey="displayDate" hide />
+                        <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax, chartMaxTarget)]} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0d1a2e', borderColor: 'rgba(0,212,255,0.3)', borderRadius: '12px' }} />
+                        <Area type="monotone" dataKey="pencapaian" stroke="#00d4ff" strokeWidth={4} fill="url(#gradAchTV)" isAnimationActive={false} dot={(props: any) => {
+                          const { cx, cy, payload, index } = props;
+                          const v = Number(payload.pencapaian);
+                          if (!v || index % 3 !== 0) return null;
                           return (
                             <g key={index}>
-                              <circle cx={cx} cy={cy} r={5}
-                                fill="#00d4ff" stroke="#04090f" strokeWidth={2} />
-                              <text x={cx} y={cy - 12} fill="#dff0ff"
-                                fontSize={11} fontWeight={900} textAnchor="middle">
-                                {fmtVal(v)}
-                              </text>
+                              <circle cx={cx} cy={cy} r={4} fill="#00d4ff" stroke="#04090f" strokeWidth={2} />
+                              <text x={cx} y={cy - 12} fill="#dff0ff" fontSize={10} fontWeight={900} textAnchor="middle">{fmtVal(v)}</text>
                             </g>
                           )
-                        }}
-                        activeDot={{ r: 7, fill: '#00d4ff' }}
-                      />
-
-                      {/* Target ideal */}
-                      <Area
-                        type="monotone"
-                        dataKey="targetIdeal"
-                        stroke="rgba(255,255,255,0.18)"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        fill="transparent"
-                        isAnimationActive={false}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        dot={(props: any) => {
-                          const { cx, cy, payload, index } = props
-                          const v = Number(payload.targetIdeal)
-                          if (!v) return (
-                            <circle key={index} cx={cx} cy={cy} r={2}
-                              fill="#475569" opacity={0.5} />
-                          )
-                          return (
-                            <g key={`t-${index}`}>
-                              <text x={cx} y={cy + 18} fill="#64748b"
-                                fontSize={10} fontWeight={700} textAnchor="middle">
-                                {fmtVal(v)}
-                              </text>
-                            </g>
-                          )
-                        }}
-                      />
-
-                      <ReferenceLine
-                        y={chartMaxTarget}
-                        stroke="#ef4444"
-                        strokeDasharray="5 5"
-                        opacity={0.35}
-                        label={{ 
-                          value: 'TARGET', 
-                          position: 'right', 
-                          fill: '#ef4444', 
-                          fontSize: 10, 
-                          fontWeight: 900 
-                        }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                        }} />
+                        <Area type="monotone" dataKey="targetIdeal" stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} strokeDasharray="5 5" fill="transparent" isAnimationActive={false} />
+                        <ReferenceLine y={chartMaxTarget} stroke="#ef4444" strokeDasharray="5 5" opacity={0.3} label={{ value: 'TARGET', position: 'insideRight', fill: '#ef4444', fontSize: 9, fontWeight: 900 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </Card>
             </>
           ) : (
-            /* Qualitative: performance summary */
             <Card className="flex-1 flex flex-col justify-center items-center text-center p-10">
-              <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center">
-                <CheckCircle2 className="h-80 w-80" />
-              </div>
-              <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.4em] mb-10">
-                Performance Summary
-              </h4>
-              <div className="grid grid-cols-2 gap-10 w-full max-w-xs">
+              <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center"><CheckCircle2 className="h-80 w-80" /></div>
+              <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.4em] mb-10">Performance Summary</h4>
+              <div className="grid grid-cols-2 gap-10 w-full max-w-sm">
                 <div className="flex flex-col gap-2">
-                  <span
-                    className="text-8xl font-black text-white"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                  >
-                    {program.completedMilestones}
-                  </span>
-                  <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">
-                    Tugas Selesai
-                  </span>
+                  <span className="text-9xl font-black text-white" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{program.completedMilestones}</span>
+                  <span className="text-xs font-black text-cyan-400 uppercase tracking-widest">Tugas Selesai</span>
                 </div>
-                <div
-                  className="flex flex-col gap-2 border-l pl-4"
-                  style={{ borderColor: 'rgba(0,200,255,0.12)' }}
-                >
-                  <span
-                    className="text-8xl font-black text-slate-700"
-                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                  >
-                    {program.totalMilestones}
-                  </span>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Total Misi
-                  </span>
+                <div className="flex flex-col gap-2 border-l pl-8" style={{ borderColor: 'rgba(0,200,255,0.12)' }}>
+                  <span className="text-9xl font-black text-slate-700" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{program.totalMilestones}</span>
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Total Misi</span>
                 </div>
               </div>
             </Card>
           )}
         </div>
 
-        {/* ── RIGHT: Stats + Ring ──────────────────────────────────── */}
+        {/* RIGHT: Stats + Yield */}
         <div className="flex flex-col gap-4 min-h-0">
-          {/* Gap Capital */}
-          <Card className="p-5 shrink-0" accentColor="#ff4d88">
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">
-              Gap Revenue Target
-            </div>
-            <div
-              className="text-3xl font-black"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ff4d88' }}
-            >
-              {formatRupiah(gapRp)}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1">Sisa yang perlu dicapai</div>
-          </Card>
+          {/* Revenue Gap */}
+          {(targetRp > 0) && (
+            <Card className="p-5" accentColor="#ff4d88">
+              <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Gap Revenue Target</div>
+              <div className="text-4xl font-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ff4d88' }}>{formatRupiah(gapRp)}</div>
+              <div className="text-[10px] text-slate-500 mt-1">Sisa yang perlu dikejar</div>
+            </Card>
+          )}
 
-          {/* Gap Peserta */}
-          <Card className="p-5 shrink-0" accentColor="#ffcc44">
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">
-              Gap Acquisition Target
-            </div>
-            <div
-              className="text-3xl font-black"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ffcc44' }}
-            >
-              {gapUser.toLocaleString()}
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Lagi menuju goal {targetUserTotal.toLocaleString()}
+          {/* User Gap */}
+          {(targetUserTotal > 0) && (
+            <Card className="p-5" accentColor="#ffcc44">
+              <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Gap User Target</div>
+              <div className="text-4xl font-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ffcc44' }}>{gapUser.toLocaleString()}</div>
+              <div className="text-[10px] text-slate-500 mt-1">Target total: {targetUserTotal.toLocaleString()}</div>
+            </Card>
+          )}
+
+          {/* Milestones */}
+          <Card className="p-5" accentColor="#00ff9d">
+            <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Misi Selesai</div>
+            <div className="text-4xl font-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}>
+              {program.completedMilestones}<span className="text-xl text-slate-600"> / {program.totalMilestones}</span>
             </div>
           </Card>
 
-          {/* Milestone counter */}
-          <Card className="p-5 shrink-0" accentColor="#00ff9d">
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">
-              Misi Selesai
-            </div>
-            <div
-              className="text-3xl font-black"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
-            >
-              {program.completedMilestones}
-              <span className="text-xl text-slate-600"> / {program.totalMilestones}</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-1">Milestone tercapai</div>
-          </Card>
-
-          {/* Ring progress */}
-          <Card className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-            <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">
-              Health Status Score
-            </div>
-            <RingProgress
-              value={program.health.healthScore}
-              max={100}
-              color={program.health.healthScore >= 80 ? '#10b981' : program.health.healthScore >= 60 ? '#f59e0b' : '#f43f5e'}
-              size={140}
-            />
+          {/* Scoring Detail Card (Instead of 0 space ring) */}
+          <Card className="flex-1 flex flex-col items-center justify-center p-6 bg-indigo-950/20">
+             <div className="mb-4 text-center">
+                <p className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-1">Status Kinerja</p>
+                <p className="text-xl font-black text-white uppercase" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{program.health.status}</p>
+             </div>
+             <RingProgress value={program.health.healthScore} max={100} color={program.health.healthScore >= 80 ? '#10b981' : program.health.healthScore >= 60 ? '#f59e0b' : '#f43f5e'} size={150} />
           </Card>
         </div>
       </main>
 
-      {/* ════════════════════════════════════════════════════════════════
-          FOOTER CTA
-      ════════════════════════════════════════════════════════════════ */}
-      <footer
-        className="relative z-10 flex items-center justify-center px-8 py-4 border-t shrink-0"
-        style={{
-          borderColor: 'rgba(255,77,136,0.2)',
-          background:
-            'linear-gradient(90deg, rgba(120,0,60,0.25), rgba(60,0,120,0.3), rgba(120,0,60,0.25))',
-        }}
-      >
-        <p
-          className="text-3xl font-black uppercase tracking-widest text-center"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ff4d88' }}
-        >
-          {motivationalMessage}
-        </p>
+      {/* FOOTER CTA */}
+      <footer className="relative z-10 flex items-center justify-center px-8 py-5 border-t shrink-0" style={{ borderColor: 'rgba(255,77,136,0.15)', background: 'linear-gradient(90deg, rgba(120,0,60,0.15), rgba(60,0,120,0.2), rgba(120,0,60,0.15))' }}>
+        <p className="text-4xl font-black uppercase tracking-[0.15em] text-center" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#ff4d88' }}>{motivationalMessage}</p>
       </footer>
     </div>
   )

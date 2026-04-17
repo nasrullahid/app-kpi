@@ -147,7 +147,7 @@ export default function TVDashboardPage() {
     if (activeSlide < currentIdx + totalPICDetailSlides) {
       const picIdx = activeSlide - currentIdx
       const pic = data.pics[picIdx]
-      const picPrograms = data.programs.filter(p => p.pic_name === pic.picName)
+      const picPrograms = data.programs.filter(p => p.team.some(m => m.id === pic.picId))
       return <SlidePICDetail pic={pic} programs={picPrograms} />
     }
 

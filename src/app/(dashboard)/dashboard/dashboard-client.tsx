@@ -217,8 +217,8 @@ function ProgramCard({ program, health, profiles }: {
           {primaryMetrics.length > 0 ? (
             primaryMetrics.map(m => {
               const actual = evaluatedMetrics[m.metric_key] || 0
-              // Use effective target from health result (handled fallback in backend)
-              const target = health.effectiveTargets?.[m.metric_key] || m.monthly_target || 0
+              // Use absolute monthly target from calculator, or definition, or fallback
+              const target = health.absoluteTargets?.[m.metric_key] || m.monthly_target || health.effectiveTargets?.[m.metric_key] || 0
               const pct = target > 0 ? (actual / target) * 100 : 0
               return (
                 <div key={m.id} className="space-y-1">
@@ -616,7 +616,7 @@ export function OverviewClient({
               icon={Target} 
               label="Total capaian Rp" 
               value={formatRupiah(summary.aggregates.revenue?.actual || 0)} 
-              sub={summary.aggregates.revenue?.isComputed ? 'Estimasi' : 'Aktual'}
+              sub={`Target: ${formatRupiah(summary.aggregates.revenue?.totalTarget || 0)}`}
               accentColor="#639922"
               comparison={previousSummary ? {
                 value: calculateGrowth(summary.aggregates.revenue?.actual || 0, previousSummary.aggregates.revenue?.actual || 0),
@@ -641,7 +641,7 @@ export function OverviewClient({
               icon={Layers} 
               label="Total capaian user" 
               value={summary.aggregates.user_acquisition?.actual || 0} 
-              sub="User"
+              sub={`Target: ${summary.aggregates.user_acquisition?.totalTarget || 0} user`}
               accentColor="#378ADD"
               comparison={previousSummary ? {
                 value: calculateGrowth(summary.aggregates.user_acquisition?.actual || 0, previousSummary.aggregates.user_acquisition?.actual || 0),
