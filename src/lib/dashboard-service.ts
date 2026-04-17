@@ -239,7 +239,7 @@ export async function getUnifiedDashboardData(options: {
       perluPerhatian: programHealths.filter(ph => ph.healthScore < 60).length
     }
 
-    const aggregates = aggregateByMetricGroup(programs, valsByProg, inputsByProg, prorationFactor, workingDays)
+    const aggregates = aggregateByMetricGroup(programs, valsByProg, inputsByProg, prorationFactor)
 
     // Calculate Global KPIs for Overview Tab
     const globalKPIs = aggregateGlobalKPIs(

@@ -59,18 +59,6 @@ export function calculateProgramHealth(
     }
   })
 
-  // Fallback to legacy daily_inputs (achievement_rp/user) if no data found in custom metrics
-  // We prioritize the new system (daily_metric_values) if any non-null data exists there for these keys
-  const inputs = dailyInputsByProgram.get(program.id) || []
-  if (manualValues['revenue'] === undefined || manualValues['revenue'] === null || manualValues['revenue'] === 0) {
-    const legacySum = inputs.reduce((sum, i) => sum + Number(i.achievement_rp || 0), 0)
-    if (legacySum > 0) manualValues['revenue'] = legacySum
-  }
-  if (manualValues['user_count'] === undefined || manualValues['user_count'] === null || manualValues['user_count'] === 0) {
-    const legacySum = inputs.reduce((sum, i) => sum + Number(i.achievement_user || 0), 0)
-    if (legacySum > 0) manualValues['user_count'] = legacySum
-  }
-
   // Pre-load baseline and target metrics for formulas
   metrics.forEach(m => {
     if (m.input_type === 'manual' && !(m.metric_key in manualValues)) {
@@ -103,25 +91,8 @@ export function calculateProgramHealth(
       const absoluteTargets: Record<string, number> = {}
 
       // First, calculate absolute targets for ALL metrics
-      const appliedLegacyInHealth = new Set<string>()
-      
-      // Default to legacy fields to ensure targets are visible even if no metric definitions exist
-      absoluteTargets['revenue'] = Number(program.monthly_target_rp) || 0
-      absoluteTargets['user_count'] = Number(program.monthly_target_user) || 0
-
       metrics.forEach(m => {
-        let mTarget = m.monthly_target || 0
-        
-        // Only use legacy as fallback if NO data at all in the metric definition
-        if (mTarget === 0) {
-          if (m.metric_key === 'revenue' || (m.data_type === 'currency' && !appliedLegacyInHealth.has('revenue'))) {
-            mTarget = Number(program.monthly_target_rp) || 0
-            appliedLegacyInHealth.add('revenue')
-          } else if (m.metric_key === 'user_count' || (m.data_type === 'integer' && !appliedLegacyInHealth.has('user'))) {
-            mTarget = Number(program.monthly_target_user) || 0
-            appliedLegacyInHealth.add('user')
-          }
-        }
+        const mTarget = m.monthly_target || 0
         
         const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
         const sumCustomTarget = vals.reduce((sum, v) => sum + (v.target_value || 0), 0)
@@ -192,79 +163,31 @@ export function calculateProgramHealth(
     }
   }
 
-  // ── Case 2: Qualitative only (milestone-based) ────────────────────────────
-  const isExplicitlyQualitative = program.target_type === 'qualitative'
-  const isMoU = (program.target_type as string) === 'mou'
-  const hasNoLegacyTargets = (program.monthly_target_rp || 0) === 0 && (program.monthly_target_user || 0) === 0
+  // ── Case 2: Qualitative only (milestone-based) fallback ─────────────────
+  const milestones = program.program_milestones || []
+  if (milestones.length > 0) {
+    const completed = milestones.filter(ms =>
+      milestoneCompletionsByMilestone.get(ms.id)?.is_completed
+    ).length
 
-  if (isExplicitlyQualitative || isMoU || (hasCustomMetrics && hasNoLegacyTargets) || (!hasCustomMetrics && hasNoLegacyTargets)) {
-    const milestones = program.program_milestones || []
-    if (milestones.length > 0) {
-      const completed = milestones.filter(ms =>
-        milestoneCompletionsByMilestone.get(ms.id)?.is_completed
-      ).length
-
-      const healthScore = (completed / milestones.length) * 100
-      return {
-        programId: program.id,
-        healthScore,
-        status: getHealthStatus(healthScore),
-        totalTargetMetrics: milestones.length,
-        isQualitativeOnly: true,
-        calculatedMetrics: evaluatedMetrics
-      }
-    }
+    const healthScore = (completed / milestones.length) * 100
     return {
       programId: program.id,
-      healthScore: 0,
-      status: 'KRITIS',
-      totalTargetMetrics: 0,
+      healthScore,
+      status: getHealthStatus(healthScore),
+      totalTargetMetrics: milestones.length,
       isQualitativeOnly: true,
       calculatedMetrics: evaluatedMetrics
     }
   }
 
-  // ── Legacy Fallback: program with no custom metrics, has Rp/User targets ──────────
-  const cumulativeRp = evaluatedMetrics['revenue'] || 0
-  const cumulativeUser = evaluatedMetrics['user_count'] || 0
-
-  const daysInSelection = prorationFactor * workingDaysInPeriod
-  const effectiveRp = program.daily_target_rp ? (program.daily_target_rp * daysInSelection) : (program.monthly_target_rp || 0) * prorationFactor
-  const effectiveUser = program.daily_target_user ? (program.daily_target_user * daysInSelection) : (program.monthly_target_user || 0) * prorationFactor
-
-  const finalRp = Math.round(effectiveRp)
-  const finalUser = Math.round(effectiveUser)
-
-  let scoreRp = 0, scoreUser = 0
-  let totalValidMetrics = 0
-
-  if (effectiveRp > 0) { scoreRp = (cumulativeRp / effectiveRp) * 100; totalValidMetrics++ }
-  if (effectiveUser > 0) { scoreUser = (cumulativeUser / effectiveUser) * 100; totalValidMetrics++ }
-
-  const healthScore = totalValidMetrics > 0 ? (scoreRp + scoreUser) / totalValidMetrics : 0
-
-  // Improvement: if both targets are 0 but there is achievement, give it a tiny health boost or at least 0.
-  // This handles the user case where they record achievement but targets are unset.
-  let finalHealth = healthScore
-  if (totalValidMetrics === 0 && (cumulativeRp > 0 || cumulativeUser > 0)) {
-    finalHealth = 100 // Or some logic to indicate activity
-  }
-
   return {
     programId: program.id,
-    healthScore: finalHealth,
-    status: getHealthStatus(finalHealth),
-    totalTargetMetrics: totalValidMetrics,
-    isQualitativeOnly: false,
-    calculatedMetrics: evaluatedMetrics,
-    effectiveTargets: {
-      revenue: finalRp,
-      user_count: finalUser
-    },
-    absoluteTargets: {
-      revenue: program.monthly_target_rp || 0,
-      user_count: program.monthly_target_user || 0
-    }
+    healthScore: 0,
+    status: 'KRITIS',
+    totalTargetMetrics: 0,
+    isQualitativeOnly: true,
+    calculatedMetrics: evaluatedMetrics
   }
 }
 
@@ -308,8 +231,7 @@ export function aggregateByMetricGroup(
   programs: ProgramWithRelations[],
   metricValuesByProgram: Map<string, MetricValue[]>,
   dailyInputsByProgram: Map<string, DailyInput[]>,
-  prorationFactor: number,
-  workingDaysInPeriod: number
+  prorationFactor: number
 ) {
   const groupRawTotals: Record<string, { actual: number, target: number, totalTarget: number }> = {
     revenue: { actual: 0, target: 0, totalTarget: 0 },
@@ -323,15 +245,13 @@ export function aggregateByMetricGroup(
   programs.forEach(prog => {
     const definitions = prog.program_metric_definitions || []
     const progMetricValues = metricValuesByProgram.get(prog.id) || []
-    const progInputs = dailyInputsByProgram.get(prog.id) || []
     
-    // Group definitions by category using synonyms and metric_group
+    // Group definitions by category
     const getProgValue = (group: string, keys: string[]) => {
       let customSum = 0
       let customTarget = 0
       let customAbsolute = 0
       let foundCustom = false
-      let legacyApplied = false
 
       definitions.forEach(m => {
         const k = m.metric_key?.toLowerCase()
@@ -344,17 +264,8 @@ export function aggregateByMetricGroup(
           const sumCustomTarget = vals.reduce((s, v) => s + (Number(v.target_value) || 0), 0)
           customTarget += sumCustomTarget
           
-          let mTarget = m.monthly_target || 0
-          if (mTarget === 0 && !legacyApplied) {
-            if (m.data_type === 'currency' && prog.monthly_target_rp) {
-              mTarget = prog.monthly_target_rp
-              legacyApplied = true
-            } else if (m.data_type === 'integer' && prog.monthly_target_user) {
-              mTarget = prog.monthly_target_user
-              legacyApplied = true
-            }
-          }
-
+          const mTarget = m.monthly_target || 0
+          
           // Important: Reconstruct absolute target from periodized targets if monthly is 0
           const absTarget = (m.monthly_target || 0) === 0 && sumCustomTarget > 0 
             ? sumCustomTarget / prorationFactor 
@@ -373,47 +284,25 @@ export function aggregateByMetricGroup(
     const lds = getProgValue('leads', ['leads', 'lead_masuk', 'prospek', 'leads_count'])
 
     // Update global aggregates
-    const processGroup = (g: string, data: { actual: number, target: number, absolute: number, found: boolean }, legacyActual: number, legacyTarget: number, legacyDaily: number) => {
-      const daysInSelection = prorationFactor * workingDaysInPeriod
-      
-      // We use custom if found ANY data there, even if 0 (prioritize new system)
-      // Otherwise fallback to legacy
-      let actual = 0
-      let target = 0
-      let totalTarget = 0
-
+    const processGroup = (g: string, data: { actual: number, target: number, absolute: number, found: boolean }) => {
       if (data.found) {
         existingGroups.add(g)
-        // Merge actuals to support migration phase (some data in legacy, some in custom)
-        actual = data.actual + legacyActual
+        groupRawTotals[g].actual += data.actual
         
-        // If custom target is 0, use legacy target as fallback for the target value
-        target = data.target > 0 ? data.target : 
-                 legacyDaily > 0 ? (legacyDaily * daysInSelection) : (legacyTarget * prorationFactor)
-        totalTarget = data.absolute > 0 ? data.absolute : legacyTarget
-      } else if (legacyActual > 0 || legacyTarget > 0) {
-        existingGroups.add(g)
-        actual = legacyActual
-        target = legacyDaily > 0 ? (legacyDaily * daysInSelection) : (legacyTarget * prorationFactor)
-        totalTarget = legacyTarget
-      }
-
-      if (existingGroups.has(g)) {
-        groupRawTotals[g].actual += actual
-        groupRawTotals[g].target += target
-        groupRawTotals[g].totalTarget += totalTarget
+        // Use custom targets (either periodized sum or monthly prorated)
+        groupRawTotals[g].target += data.target > 0 ? data.target : (data.absolute * prorationFactor)
+        groupRawTotals[g].totalTarget += data.absolute
       }
     }
 
-    processGroup('revenue', rev, progInputs.reduce((sum, i) => sum + (Number(i.achievement_rp) || 0), 0), prog.monthly_target_rp || 0, prog.daily_target_rp || 0)
-    processGroup('user_acquisition', acq, progInputs.reduce((sum, i) => sum + (Number(i.achievement_user) || 0), 0), prog.monthly_target_user || 0, prog.daily_target_user || 0)
+    processGroup('revenue', rev)
+    processGroup('user_acquisition', acq)
     
-    // Ads groups usually don't have legacy fallbacks
     if (spd.found) {
       existingGroups.add('ad_spend')
       groupRawTotals.ad_spend.actual += spd.actual
-      groupRawTotals.ad_spend.target += spd.target
-      groupRawTotals.ad_spend.totalTarget += spd.absolute > 0 ? spd.absolute : spd.target
+      groupRawTotals.ad_spend.target += spd.target > 0 ? spd.target : (spd.absolute * prorationFactor)
+      groupRawTotals.ad_spend.totalTarget += spd.absolute
     }
     if (lds.found) {
       existingGroups.add('leads')
@@ -631,9 +520,7 @@ export function aggregateGlobalKPIs(
   const totalPrograms = programs.length
   const activeProgramsCount = programs.filter(p => 
     (p.program_metric_definitions?.length || 0) > 0 || 
-    (p.program_milestones?.length || 0) > 0 ||
-    (Number(p.monthly_target_rp) || 0) > 0 ||
-    (Number(p.monthly_target_user) || 0) > 0
+    (p.program_milestones?.length || 0) > 0
   ).length
   
   const avgHealth = programResults.length > 0 
@@ -801,8 +688,8 @@ export function buildTargetTrendSeries(
       const revMetric = metrics.find(m => m.metric_key === 'revenue')
       const userMetric = metrics.find(m => m.metric_key === 'user_count')
 
-      totalMonthlyTargetRevenue += (Number(revMetric?.monthly_target) || Number(p.monthly_target_rp) || 0)
-      totalMonthlyTargetUser += (Number(userMetric?.monthly_target) || Number(p.monthly_target_user) || 0)
+      totalMonthlyTargetRevenue += (Number(revMetric?.monthly_target) || 0)
+      totalMonthlyTargetUser += (Number(userMetric?.monthly_target) || 0)
     })
   }
 
@@ -843,15 +730,8 @@ export function buildTargetTrendSeries(
       const revVal = dayMetrics.filter(mv => revIds.includes(mv.metric_definition_id)).reduce((s, v) => s + (v.value || 0), 0)
       const userVal = dayMetrics.filter(mv => acqIds.includes(mv.metric_definition_id)).reduce((s, v) => s + (v.value || 0), 0)
 
-      // Fallback to daily inputs (legacy system)
-      const progInputs = inputsByProgram.get(p.id) || []
-      const dayInputs = progInputs.filter(di => di.date === d)
-
-      const legacyRev = dayInputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
-      const legacyUser = dayInputs.reduce((s, i) => s + Number(i.achievement_user || 0), 0)
-
-      dailyActualRevenue += (revVal || legacyRev)
-      dailyActualUser += (userVal || legacyUser)
+      dailyActualRevenue += revVal
+      dailyActualUser += userVal
     })
 
     return {

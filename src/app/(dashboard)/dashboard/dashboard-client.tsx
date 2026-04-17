@@ -142,34 +142,10 @@ function ProgramCard({ program, health, profiles, onClick }: {
   const isQualitative = health.isQualitativeOnly
   const evaluatedMetrics = health.calculatedMetrics || {}
 
+  // Primary metrics derived from metric definitions (mapped in calculator)
   const defs = program.program_metric_definitions || []
   const primaryMetrics = defs.filter(m => m.is_primary && m.is_target_metric)
   const secondaryMetrics = defs.filter(m => !m.is_primary)
-
-  // Synthetic primary metrics for legacy programs if no custom primary metrics exist
-  if (primaryMetrics.length === 0 && !isQualitative) {
-    const hasLegacyRp = (program.monthly_target_rp || 0) > 0 || (program.daily_target_rp || 0) > 0
-    const hasLegacyUser = (program.monthly_target_user || 0) > 0 || (program.daily_target_user || 0) > 0
-    
-    if (hasLegacyRp) {
-      primaryMetrics.push({
-        id: 'legacy_rp',
-        metric_key: 'revenue',
-        label: 'Omzet',
-        data_type: 'currency',
-        unit_label: 'Rp'
-      } as unknown as Database['public']['Tables']['program_metric_definitions']['Row'])
-    }
-    if (hasLegacyUser) {
-      primaryMetrics.push({
-        id: 'legacy_user',
-        metric_key: 'user_count',
-        label: 'Closing',
-        data_type: 'integer',
-        unit_label: 'user'
-      } as unknown as Database['public']['Tables']['program_metric_definitions']['Row'])
-    }
-  }
 
   // Milestone progress for qualitative/hybrid
   const milestones = program.program_milestones || []
@@ -363,8 +339,8 @@ export function OverviewClient({
 
     if (!program || !ph) return null
 
-    const targetRevenue = ph.absoluteTargets?.revenue || Number(program.monthly_target_rp) || 0
-    const targetUser = ph.absoluteTargets?.user_count || ph.absoluteTargets?.user_acquisition || Number(program.monthly_target_user) || 0
+    const targetRevenue = ph.absoluteTargets?.revenue || 0
+    const targetUser = ph.absoluteTargets?.user_count || ph.absoluteTargets?.user_acquisition || 0
 
     // Recalculate trend for this single program
     const trend = buildTargetTrendSeries(
@@ -476,10 +452,10 @@ export function OverviewClient({
       const metrics = ph.calculatedMetrics || {}
       
       const revActual = metrics.revenue || metrics.omzet || 0
-      const revTarget = ph.absoluteTargets?.revenue || ph.absoluteTargets?.omzet || ph.program.monthly_target_rp || 0
+      const revTarget = ph.absoluteTargets?.revenue || ph.absoluteTargets?.omzet || 0
       
       const userActual = metrics.user_count || metrics.closing || metrics.user_acquisition || 0
-      const userTarget = ph.absoluteTargets?.user_count || ph.absoluteTargets?.closing || ph.absoluteTargets?.user_acquisition || ph.program.monthly_target_user || 0
+      const userTarget = ph.absoluteTargets?.user_count || ph.absoluteTargets?.closing || ph.absoluteTargets?.user_acquisition || 0
       
       const milestones = p.program_milestones || []
       const completedMilestones = milestones.filter(m => 
