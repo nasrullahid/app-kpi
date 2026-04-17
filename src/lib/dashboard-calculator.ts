@@ -59,6 +59,19 @@ export function calculateProgramHealth(
     }
   })
 
+  // ── RE-INTRODUCTION OF LEGACY ACHIEVEMENT FALLBACK ─────────────────────────
+  // If we have 0/null in revenue or user_count from metrics, check daily_inputs
+  const legacyInputs = dailyInputsByProgram.get(program.id) || []
+  if (!manualValues['revenue'] || manualValues['revenue'] === 0) {
+    const legacySum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_rp || 0), 0)
+    if (legacySum > 0) manualValues['revenue'] = legacySum
+  }
+  if (!manualValues['user_count'] || manualValues['user_count'] === 0) {
+    const legacySum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_user || 0), 0)
+    if (legacySum > 0) manualValues['user_count'] = legacySum
+  }
+  // ───────────────────────────────────────────────────────────────────────────
+
   // Pre-load baseline and target metrics for formulas
   metrics.forEach(m => {
     if (m.input_type === 'manual' && !(m.metric_key in manualValues)) {
@@ -274,6 +287,16 @@ export function aggregateByMetricGroup(
           customAbsolute += absTarget
         }
       })
+
+      // LEGACY FALLBACK for aggregation
+      if (customSum === 0) {
+        const legacyInputs = dailyInputsByProgram.get(prog.id) || []
+        if (group === 'revenue' || keys.includes('revenue')) {
+          customSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_rp || 0), 0)
+        } else if (group === 'user_acquisition' || keys.includes('user_count')) {
+          customSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_user || 0), 0)
+        }
+      }
       
       return { actual: customSum, target: customTarget, absolute: customAbsolute, found: foundCustom }
     }
@@ -730,8 +753,13 @@ export function buildTargetTrendSeries(
       const revVal = dayMetrics.filter(mv => revIds.includes(mv.metric_definition_id)).reduce((s, v) => s + (v.value || 0), 0)
       const userVal = dayMetrics.filter(mv => acqIds.includes(mv.metric_definition_id)).reduce((s, v) => s + (v.value || 0), 0)
 
-      dailyActualRevenue += revVal
-      dailyActualUser += userVal
+      // LEGACY FALLBACK for trend series
+      const progInputs = inputsByProgram.get(p.id)?.filter(di => di.date === d) || []
+      const legacyRev = progInputs.reduce((s, v) => s + (Number(v.achievement_rp) || 0), 0)
+      const legacyUser = progInputs.reduce((s, v) => s + (Number(v.achievement_user) || 0), 0)
+
+      dailyActualRevenue += (revVal || legacyRev)
+      dailyActualUser += (userVal || legacyUser)
     })
 
     return {

@@ -11,6 +11,7 @@ import {
   HeartPulse,
   Target,
   Layers,
+  Handshake,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +23,7 @@ interface NavLinksProps {
 const dashboardSubItems = [
   {
     name: 'Ringkasan',
-    href: '/dashboard',
+    href: '/dashboard?tab=overview',
     activeTab: 'overview',
     icon: HeartPulse,
   },
@@ -37,6 +38,12 @@ const dashboardSubItems = [
     href: '/dashboard?tab=ads',
     activeTab: 'ads',
     icon: Layers,
+  },
+  {
+    name: 'MoU Tracker',
+    href: '/dashboard?tab=mou',
+    activeTab: 'mou',
+    icon: Handshake,
   },
 ]
 
