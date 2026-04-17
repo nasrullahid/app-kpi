@@ -14,7 +14,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  BarChart,
   Bar,
   ComposedChart,
   Line,
@@ -164,6 +163,7 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
     tvMetrics.find(m => m.metric_group === 'user_acquisition') ||
     tvMetrics[0]
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let chartData: any[] = []
   let chartMaxTarget = 0
   let chartLabel = isAds ? "Daily Performance (Spend vs ROAS)" : "Cumulative Analytics"
@@ -171,26 +171,44 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
   if (isAds) {
     // Specialized Ads Chart: Daily Spend (Bar) vs ROAS (Line)
     const spendDef = metricDefinitions.find(m => m.metric_group === 'ad_spend' || m.metric_key === 'ad_spend' || m.metric_key === 'ads_spent')
-    const roasDef = metricDefinitions.find(m => m.metric_group === 'efficiency' || m.metric_key === 'roas')
+    const revDef = metricDefinitions.find(m => m.metric_group === 'revenue' || m.metric_key === 'revenue')
 
     if (spendDef) {
-      const spendValues = (metricValues || []).filter(mv => mv.metric_definition_id === spendDef.id)
-      const roasValues = roasDef ? (metricValues || []).filter(mv => mv.metric_definition_id === roasDef.id) : []
-
-      // Group by date
+      // Collect Spend values
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dataMap = new Map<string, any>()
+      const spendValues = (metricValues || []).filter(mv => mv.metric_definition_id === spendDef.id)
+      
       spendValues.forEach(sv => {
         dataMap.set(sv.date, { 
           date: sv.date, 
           displayDate: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(sv.date)),
           spend: Number(sv.value || 0),
+          revenue: 0,
           roas: 0 
         })
       })
 
-      roasValues.forEach(rv => {
-        if (dataMap.has(rv.date)) {
-          dataMap.get(rv.date)!.roas = Number(rv.value || 0)
+      // Collect Revenue (Unified)
+      if (revDef) {
+        (metricValues || []).filter(mv => mv.metric_definition_id === revDef.id).forEach(rv => {
+          if (dataMap.has(rv.date)) {
+            dataMap.get(rv.date)!.revenue += Number(rv.value || 0)
+          }
+        })
+      }
+
+      // Collect Revenue (Legacy Fallback)
+      (inputs || []).forEach(di => {
+        if (dataMap.has(di.date)) {
+          dataMap.get(di.date)!.revenue += Number(di.achievement_rp || 0)
+        }
+      })
+
+      // Calculate ROAS
+      dataMap.forEach(v => {
+        if (v.spend > 0) {
+          v.roas = v.revenue / v.spend
         }
       })
 
@@ -395,10 +413,10 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                         <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">{metric.label}</div>
                         <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
                           <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                            {formatMetricValue(achieved, metric.dataType as any, metric.unit)}
+                            {formatMetricValue(achieved, metric.dataType as 'integer' | 'currency' | 'percentage' | 'float' | 'boolean', metric.unit)}
                           </div>
                           <div className="text-[10px] text-slate-500 uppercase mb-2">
-                            Target: {formatMetricValue(target, metric.dataType as any, metric.unit)}
+                            Target: {formatMetricValue(target, metric.dataType as 'integer' | 'currency' | 'percentage' | 'float' | 'boolean', metric.unit)}
                           </div>
                         </div>
                         <ProgressBar pct={isLower ? Math.max(0, 100 - pct + 100) : pct} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
@@ -465,13 +483,34 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                   {isAds ? (
                     <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                       <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                        <XAxis dataKey="displayDate" hide />
-                        <YAxis yAxisId="left" hide />
-                        <YAxis yAxisId="right" orientation="right" hide />
+                        <XAxis 
+                          dataKey="displayDate" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                          interval={4}
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                          tickFormatter={(val) => val >= 1000000 ? `${(val/1000000).toFixed(1)}jt` : val.toLocaleString()}
+                        />
+                        <YAxis 
+                          yAxisId="right" 
+                          orientation="right" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#22d3ee', fontSize: 10, fontWeight: 700 }}
+                          tickFormatter={(val) => `${val.toFixed(1)}x`}
+                        />
                         <Tooltip contentStyle={{ backgroundColor: '#0d1a2e', borderColor: 'rgba(255,100,255,0.2)', borderRadius: '12px' }} />
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                         <Bar yAxisId="left" dataKey="spend" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false}>
-                          <LabelList dataKey="spend" position="top" content={(props: any) => {
+                          <LabelList dataKey="spend" position="top" content={
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (props: any) => {
                             const { x, y, width, value } = props;
                             if (!value) return null;
                             return (
@@ -482,7 +521,9 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                           }} />
                         </Bar>
                         <Line yAxisId="right" type="monotone" dataKey="roas" stroke="#22d3ee" strokeWidth={3} dot={{ r: 4, fill: '#22d3ee' }} isAnimationActive={false}>
-                          <LabelList dataKey="roas" position="top" content={(props: any) => {
+                          <LabelList dataKey="roas" position="top" content={
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (props: any) => {
                             const { x, y, value } = props;
                             if (value === undefined) return null;
                             return (
@@ -504,10 +545,24 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,150,255,0.06)" />
-                        <XAxis dataKey="displayDate" hide />
-                        <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax, chartMaxTarget)]} />
+                        <XAxis 
+                          dataKey="displayDate" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                          interval={4}
+                        />
+                        <YAxis 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                          tickFormatter={(val) => val >= 1000000 ? `${(val/1000000).toFixed(1)}jt` : val.toLocaleString()}
+                          domain={[0, (dataMax: number) => Math.max(dataMax, chartMaxTarget) * 1.1]}
+                        />
                         <Tooltip contentStyle={{ backgroundColor: '#0d1a2e', borderColor: 'rgba(0,212,255,0.3)', borderRadius: '12px' }} />
-                        <Area type="monotone" dataKey="pencapaian" stroke="#00d4ff" strokeWidth={4} fill="url(#gradAchTV)" isAnimationActive={false} dot={(props: any) => {
+                        <Area type="monotone" dataKey="pencapaian" stroke="#00d4ff" strokeWidth={4} fill="url(#gradAchTV)" isAnimationActive={false} dot={
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          (props: any) => {
                           const { cx, cy, payload, index } = props;
                           const v = Number(payload.pencapaian);
                           if (!v || index % 3 !== 0) return null;

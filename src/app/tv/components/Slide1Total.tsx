@@ -80,7 +80,7 @@ export function Slide1Total({ data }: Slide1Props) {
           {activeGroups.map(key => {
             const group = aggregate.metricGroups[key];
             const config = groupConfig[key];
-            const pct = group.totalTarget > 0 ? (group.actual / group.totalTarget) * 100 : 0;
+            const pct = group.target > 0 ? (group.actual / group.target) * 100 : 0;
             const Icon = config.icon;
 
             return (
@@ -97,14 +97,14 @@ export function Slide1Total({ data }: Slide1Props) {
                     {config.isCurrency ? formatRupiah(group.actual) : group.actual.toLocaleString()}
                     {!config.isCurrency && key === 'efficiency' && 'x'}
                   </div>
-                  {group.totalTarget > 0 && (
+                  {group.target > 0 && (
                     <div className="text-sm font-bold text-slate-500 uppercase mt-2">
-                      Target Bulanan: {config.isCurrency ? formatRupiah(group.totalTarget) : group.totalTarget.toLocaleString()}
+                      Target Bulanan: {config.isCurrency ? formatRupiah(group.target) : group.target.toLocaleString()}
                     </div>
                   )}
                 </div>
 
-                {group.totalTarget > 0 && (
+                {group.target > 0 && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs font-black">
                       <span className="text-slate-400 uppercase">Progres Bulanan</span>
