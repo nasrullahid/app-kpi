@@ -14,7 +14,7 @@ import { formatRupiah, cn, getPreviousPeriodLabel } from '@/lib/utils'
 import { formatMetricValue } from '@/lib/formula-evaluator'
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, ComposedChart, Legend, Line, AreaChart, Area, Cell
+  BarChart, Bar, ComposedChart, Legend, Line, AreaChart, Area, Cell, ReferenceLine
 } from 'recharts'
 import {
   HeartPulse, Layers, Target, CheckSquare,
@@ -23,6 +23,14 @@ import {
 
 import { DashboardSummary } from '@/lib/dashboard-service'
 import { RadialProgressCard } from '@/components/dashboard/radial-progress-card'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { ProgramDetailView } from '@/components/dashboard/program-detail-view'
 
 interface OverviewClientProps {
   programs: ProgramWithRelations[]
@@ -118,10 +126,11 @@ function KpiCard({ icon: Icon, label, value, sub, accentColor, comparison }: {
 }
 
 // ── Individual Program Card ───────────────────────────────────────────────────
-function ProgramCard({ program, health, profiles }: {
+function ProgramCard({ program, health, profiles, onClick }: {
   program: ProgramWithRelations
   health: ReturnType<typeof calculateProgramHealth>
   profiles: { id: string; name: string }[]
+  onClick?: () => void
 }) {
   const { label, badge, accent } = getStatusLabelAndColor(health.healthScore)
   const isQualitative = health.isQualitativeOnly
@@ -162,7 +171,10 @@ function ProgramCard({ program, health, profiles }: {
   const pics = (program.program_pics || []).map(pic => profiles.find(pr => pr.id === pic.profile_id)).filter(Boolean)
 
   return (
-    <div className="bg-white rounded-xl border border-[#E5E7EB] transition-all duration-300 overflow-hidden group flex flex-col relative">
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-xl border border-[#E5E7EB] transition-all duration-300 overflow-hidden group flex flex-col relative cursor-pointer hover:border-[#534AB7] hover:shadow-md active:scale-[0.99]"
+    >
       {/* Vertical Accent */}
       <div className="absolute left-0 top-0 bottom-0 w-[4px]" style={{ backgroundColor: accent }} />
       
@@ -294,6 +306,7 @@ export function OverviewClient({
   
   // Sync activeTab with URL ?tab=...
   const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null)
   
   useEffect(() => {
     const tab = searchParams.get('tab') as TabType
@@ -435,9 +448,9 @@ export function OverviewClient({
             activeTab === 'target' ? "bg-white text-[#534AB7] border border-[#E5E7EB] shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
           )}
         >
-          <Target className="h-3.5 w-3.5" />
-          Target
-        </button>
+            <Target className="h-3.5 w-3.5" />
+            Omzet
+          </button>
         <button
           onClick={() => handleTabChange('ads')}
           className={cn(
@@ -448,6 +461,17 @@ export function OverviewClient({
           <Layers className="h-3.5 w-3.5" />
           Iklan & Ads
         </button>
+      </div>
+      
+      {/* Motivational Banner relocated here (Global) */}
+      <div className={cn("px-8 py-10 rounded-2xl border flex flex-col items-center justify-center text-center gap-6 shadow-sm transition-all", banner.bg, banner.border)}>
+        <div className={cn("p-4 rounded-full shadow-inner", banner.bg === 'bg-[#FCEBEB]' ? 'bg-white' : 'bg-white/50')}>
+           <div className={cn("h-6 w-6 rounded-full animate-pulse", getStatusLabelAndColor(globalKPIs.avgHealth).dot)} />
+        </div>
+        <h2 className={cn("text-xl md:text-2xl font-black tracking-tight max-w-xl leading-tight uppercase", banner.textCol)}>
+          {banner.text}
+        </h2>
+        <div className="h-1 w-24 rounded-full bg-slate-200/50" />
       </div>
 
       {activeTab === 'overview' && (
@@ -556,16 +580,6 @@ export function OverviewClient({
              </div>
           </div>
 
-          {/* Motivational Banner redesigned as a LARGE prominent card */}
-          <div className={cn("px-8 py-10 rounded-2xl border flex flex-col items-center justify-center text-center gap-6 shadow-sm transition-all", banner.bg, banner.border)}>
-            <div className={cn("p-4 rounded-full shadow-inner", banner.bg === 'bg-[#FCEBEB]' ? 'bg-white' : 'bg-white/50')}>
-               <div className={cn("h-6 w-6 rounded-full animate-pulse", getStatusLabelAndColor(globalKPIs.avgHealth).dot)} />
-            </div>
-            <h2 className={cn("text-xl md:text-2xl font-black tracking-tight max-w-xl leading-tight uppercase", banner.textCol)}>
-              {banner.text}
-            </h2>
-            <div className="h-1 w-24 rounded-full bg-slate-200/50" />
-          </div>
 
           {/* Search & Program Grid */}
           <div className="space-y-6 pt-2">
@@ -592,7 +606,13 @@ export function OverviewClient({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
               {filteredPrograms.map(ph => (
-                <ProgramCard key={ph.program.id} program={ph.program} health={ph} profiles={profiles} />
+                <ProgramCard 
+                  key={ph.program.id} 
+                  program={ph.program} 
+                  health={ph} 
+                  profiles={profiles} 
+                  onClick={() => setSelectedProgramId(ph.program.id)}
+                />
               ))}
             </div>
             
@@ -608,13 +628,13 @@ export function OverviewClient({
         </div>
       )}
 
-      {activeTab === 'target' && (
+       {activeTab === 'target' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {/* Row 1: Target Aggregate Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {/* Row 1: Omzet Aggregate Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <KpiCard 
               icon={Target} 
-              label="Total capaian Rp" 
+              label="Total capaian Omzet" 
               value={formatRupiah(summary.aggregates.revenue?.actual || 0)} 
               sub={`Target: ${formatRupiah(summary.aggregates.revenue?.totalTarget || 0)}`}
               accentColor="#639922"
@@ -637,31 +657,6 @@ export function OverviewClient({
                 label: prevPeriodLabel
               } : undefined}
             />
-            <KpiCard 
-              icon={Layers} 
-              label="Total capaian user" 
-              value={summary.aggregates.user_acquisition?.actual || 0} 
-              sub={`Target: ${summary.aggregates.user_acquisition?.totalTarget || 0} user`}
-              accentColor="#378ADD"
-              comparison={previousSummary ? {
-                value: calculateGrowth(summary.aggregates.user_acquisition?.actual || 0, previousSummary.aggregates.user_acquisition?.actual || 0),
-                label: prevPeriodLabel
-              } : undefined}
-            />
-            <KpiCard 
-              icon={CheckSquare} 
-              label="Sisa target user" 
-              value={Math.max(0, (summary.aggregates.user_acquisition?.totalTarget || 0) - (summary.aggregates.user_acquisition?.actual || 0))} 
-              sub="user sisa target" 
-              accentColor="#EAB308"
-              comparison={previousSummary ? {
-                value: calculateGrowth(
-                  Math.max(0, (summary.aggregates.user_acquisition?.totalTarget || 0) - (summary.aggregates.user_acquisition?.actual || 0)),
-                  Math.max(0, (previousSummary.aggregates.user_acquisition?.totalTarget || 0) - (previousSummary.aggregates.user_acquisition?.actual || 0))
-                ),
-                label: prevPeriodLabel
-              } : undefined}
-            />
              <KpiCard 
               icon={HeartPulse} 
               label="Progres global" 
@@ -675,10 +670,10 @@ export function OverviewClient({
             />
           </div>
 
-          {/* Row 2: Secondary Visuals (Radial + Trend) */}
+          {/* Row 2: Visuals (Radial + Trend) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-             {/* Radial Cards Column */}
-             <div className="lg:col-span-4 grid grid-cols-1 gap-6">
+             {/* Radial Card Column */}
+             <div className="lg:col-span-4 gap-6">
                 <RadialProgressCard 
                   title="Revenue Progress"
                   value={summary.aggregates.revenue?.actual || 0}
@@ -689,50 +684,68 @@ export function OverviewClient({
                   unitLabel="Rp"
                   color="#639922"
                 />
-                <RadialProgressCard 
-                  title="User Acquisition"
-                  value={summary.aggregates.user_acquisition?.actual || 0}
-                  target={summary.aggregates.user_acquisition?.totalTarget || 0}
-                  percentage={(summary.aggregates.user_acquisition?.actual / (summary.aggregates.user_acquisition?.totalTarget || 1)) * 100}
-                  displayValue={String(summary.aggregates.user_acquisition?.actual || 0)}
-                  displayTarget={String(summary.aggregates.user_acquisition?.totalTarget || 0)}
-                  unitLabel="user"
-                  color="#378ADD"
-                />
              </div>
 
-             {/* Target Trend Chart Column */}
+             {/* Omzet Trend Chart Column */}
              <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <h3 className="font-bold text-slate-800 mb-6 text-sm flex items-center gap-2">
                   <div className="p-2 bg-indigo-50 rounded-lg">
                     <TrendingUp className="h-4 w-4 text-[#534AB7]" />
                   </div>
-                  Tren akumulasi capaian vs target
+                  Tren harian Omzet & Perolehan User
                 </h3>
                 <div className="h-[460px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={summary.targetTrend}>
-                      <defs>
-                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                      <YAxis yAxisId="left" hide />
+                      <YAxis 
+                        yAxisId="left" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                        tickFormatter={(v) => `Rp${v/1000000}jt`} 
+                        domain={[0, (dataMax: number) => {
+                          const target = summary.targetTrend?.[0]?.targetRevenue || 0
+                          return Math.max(dataMax, target) * 1.1
+                        }]}
+                      />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#378ADD' }} 
+                        domain={[0, (dataMax: number) => {
+                          const target = summary.targetTrend?.[0]?.targetUser || 0
+                          return Math.max(dataMax, target) * 1.2
+                        }]}
+                      />
                       <Tooltip 
                         contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none' }}
-                        formatter={(v: unknown, name: unknown) => {
+                        formatter={(
+                          /* eslint-disable @typescript-eslint/no-explicit-any */
+                          v: any, 
+                          name: any
+                          /* eslint-enable @typescript-eslint/no-explicit-any */
+                        ) => {
                           const n = String(name || '')
-                          if (n.includes('Revenue')) return [formatRupiah(Number(v || 0)), n]
-                          return [v as string | number, n]
+                          if (n.includes('Revenue') || n.toLowerCase().includes('omzet')) return [formatRupiah(Number(v || 0)), 'Omzet']
+                          if (n.toLowerCase().includes('user')) return [v, 'User Baru']
+                          return [v, n]
                         }}
                       />
                       <Legend verticalAlign="top" height={36} iconType="circle" />
-                      <Area yAxisId="left" type="monotone" dataKey="actualRevenue" name="Capaian Rp" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                      <Line yAxisId="left" type="monotone" dataKey="targetRevenue" name="Target Rp (Prorata)" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                      <Bar yAxisId="left" dataKey="actualUser" name="Capaian User" fill="#378ADD" radius={[4, 4, 0, 0]} barSize={10} />
+                      <Bar yAxisId="left" dataKey="actualRevenue" name="Omzet Harian" fill="#639922" radius={[4, 4, 0, 0]} barSize={20} />
+                      <Line yAxisId="right" type="monotone" dataKey="actualUser" name="User Harian" stroke="#378ADD" strokeWidth={3} dot={{ r: 4, fill: '#378ADD' }} activeDot={{ r: 6 }} />
+                      
+                      {/* Reference Lines for daily targets */}
+                      {summary.targetTrend && summary.targetTrend.length > 0 && (
+                        <>
+                 <ReferenceLine yAxisId="left" y={summary.targetTrend[0].targetRevenue} stroke="#639922" strokeDasharray="5 5" label={{ position: 'right', value: 'Target Harian', fill: '#639922', fontSize: 10 }} />
+                 <ReferenceLine yAxisId="right" y={summary.targetTrend[0].targetUser} stroke="#378ADD" strokeDasharray="3 3" label={{ position: 'left', value: 'Target User', fill: '#378ADD', fontSize: 10 }} />
+                        </>
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -932,7 +945,6 @@ export function OverviewClient({
                     .map(ph => {
                       const metrics = ph.calculatedMetrics || {}
                       
-                      // Robust extraction with synonyms
                       const getVal = (keys: string[]) => {
                         for (const k of keys) {
                           if (metrics[k] !== undefined && metrics[k] !== null) return metrics[k]
@@ -950,7 +962,11 @@ export function OverviewClient({
                       const cr = metrics.conversion_rate || (leads > 0 ? (goals / leads) * 100 : 0)
                       
                       return (
-                        <tr key={ph.program.id} className="hover:bg-slate-50 transition-colors group">
+                        <tr 
+                          key={ph.program.id} 
+                          className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedProgramId(ph.program.id)}
+                        >
                            <td className="px-6 py-4 font-semibold text-[#111827] text-[13px]">{ph.program.name}</td>
                            <td className="px-6 py-4 text-right text-[#111827] text-[12px] font-medium">{formatRupiah(spent)}</td>
                            <td className="px-6 py-4 text-right text-[#111827] text-[12px] font-medium">{goals}</td>
@@ -975,6 +991,28 @@ export function OverviewClient({
           </div>
         </div>
       )}
+
+      {/* Program Detail Side Panel (Drill Down) */}
+      <Sheet open={!!selectedProgramId} onOpenChange={(open) => !open && setSelectedProgramId(null)}>
+        <SheetContent className="sm:max-w-xl md:max-w-2xl overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle className="text-sm font-bold text-[#6B7280] uppercase tracking-widest">Detail Program</SheetTitle>
+            <SheetDescription className="hidden">Menampilkan detail statistik dan performa harian.</SheetDescription>
+          </SheetHeader>
+          
+          {selectedProgramId && (() => {
+            const ph = programHealths.find(p => p.program.id === selectedProgramId)
+            if (!ph) return null
+            return (
+              <ProgramDetailView 
+                program={ph.program} 
+                health={ph} 
+                metricValues={metricValues} 
+              />
+            )
+          })()}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

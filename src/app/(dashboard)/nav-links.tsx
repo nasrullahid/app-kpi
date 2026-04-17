@@ -27,7 +27,7 @@ const dashboardSubItems = [
     icon: HeartPulse,
   },
   {
-    name: 'Target Kinerja',
+    name: 'Omzet',
     href: '/dashboard?tab=target',
     activeTab: 'target',
     icon: Target,

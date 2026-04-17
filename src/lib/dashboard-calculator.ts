@@ -782,16 +782,13 @@ export function buildTargetTrendSeries(
   })
 
   return dateRange.map(d => {
-    const dayOfMonth = new Date(d).getDate()
-    const prorationFactor = Math.min(dayOfMonth / workingDays, 1)
-
     let dailyActualRevenue = 0
     let dailyActualUser = 0
 
     programs.forEach(p => {
       const defs = p.program_metric_definitions || []
       const progMetrics = metricsByProgram.get(p.id) || []
-      const dayMetrics = progMetrics.filter(mv => mv.date <= d)
+      const dayMetrics = progMetrics.filter(mv => mv.date === d)
 
       // Identify metric IDs using synonyms or group
       const findIds = (group: string, keys: string[]) => 
@@ -805,22 +802,22 @@ export function buildTargetTrendSeries(
 
       // Fallback to daily inputs (legacy system)
       const progInputs = inputsByProgram.get(p.id) || []
-      const dayInputs = progInputs.filter(di => di.date <= d)
+      const dayInputs = progInputs.filter(di => di.date === d)
 
       const legacyRev = dayInputs.reduce((s, i) => s + Number(i.achievement_rp || 0), 0)
       const legacyUser = dayInputs.reduce((s, i) => s + Number(i.achievement_user || 0), 0)
 
-      dailyActualRevenue += (revVal || (revIds.length === 0 ? legacyRev : 0))
-      dailyActualUser += (userVal || (acqIds.length === 0 ? legacyUser : 0))
+      dailyActualRevenue += (revVal || legacyRev)
+      dailyActualUser += (userVal || legacyUser)
     })
 
     return {
       date: d,
       displayDate: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(d)),
       actualRevenue: Math.round(dailyActualRevenue),
-      targetRevenue: Math.round(totalMonthlyTargetRevenue * prorationFactor),
+      targetRevenue: Math.round(totalMonthlyTargetRevenue / workingDays),
       actualUser: Math.round(dailyActualUser),
-      targetUser: Math.round(totalMonthlyTargetUser * prorationFactor)
+      targetUser: Math.round(totalMonthlyTargetUser / workingDays)
     }
   })
 }
