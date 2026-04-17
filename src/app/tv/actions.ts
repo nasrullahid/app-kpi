@@ -23,12 +23,18 @@ export type Program = Database['public']['Tables']['programs']['Row'] & {
 export type DailyInput = Database['public']['Tables']['daily_inputs']['Row']
 export type Period = Database['public']['Tables']['periods']['Row']
 
+export type UnifiedMetric = {
+  key: string
+  label: string
+  achieved: number
+  target: number
+  unit: string
+  dataType: string
+}
+
 export type ProgramPerformance = ProgramWithRelations & {
   health: ProgramHealthResult
-  achievementRp: number
-  achievementUser: number
-  percentageRp: number
-  percentageUser: number
+  unifiedPrimaryMetrics: UnifiedMetric[]
   qualitativePercentage: number
   totalMilestones: number
   completedMilestones: number
@@ -90,9 +96,62 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
   const programPerformance: ProgramPerformance[] = data.summary.programHealths.map(ph => {
     const prog = ph.program
     
-    const progInputs = data.dailyInputs.filter(i => i.program_id === prog.id)
-    const achievementRp = progInputs.reduce((sum, i) => sum + (i.achievement_rp || 0), 0)
-    const achievementUser = progInputs.reduce((sum, i) => sum + (i.achievement_user || 0), 0)
+    // Use unified metrics from calculated results
+    const definitions = prog.program_metric_definitions || []
+    
+    // Identify primary candidates: explicitly marked OR belonging to core groups
+    const coreGroupKeys = ['revenue', 'user_acquisition']
+    const coreMetricKeys = ['revenue', 'user_count', 'omzet', 'closing']
+    
+    const primaryDefs = definitions.filter(m => 
+      m.is_primary || 
+      coreGroupKeys.includes(m.metric_group || '') || 
+      coreMetricKeys.includes(m.metric_key?.toLowerCase() || '')
+    ).filter(m => m.is_target_metric)
+    // Sort to keep revenue first, then user_count, then others
+    .sort((a, b) => {
+      const getPriority = (m: MetricDefinition) => {
+        const k = m.metric_key?.toLowerCase()
+        const g = m.metric_group
+        if (g === 'revenue' || k === 'revenue' || k === 'omzet') return 1
+        if (g === 'user_acquisition' || k === 'user_count' || k === 'closing') return 2
+        return 3
+      }
+      return getPriority(a) - getPriority(b)
+    })
+
+    const unifiedPrimaryMetrics: UnifiedMetric[] = primaryDefs.map(m => ({
+      key: m.metric_key,
+      label: m.label,
+      achieved: ph.calculatedMetrics?.[m.metric_key] || 0,
+      target: ph.effectiveTargets?.[m.metric_key] || 0,
+      unit: m.unit_label || '',
+      dataType: m.data_type
+    }))
+
+    // Fallback for legacy programs without primary metric definitions
+    if (unifiedPrimaryMetrics.length === 0 && !ph.isQualitativeOnly) {
+      if ((prog.monthly_target_rp || 0) > 0) {
+        unifiedPrimaryMetrics.push({
+          key: 'revenue',
+          label: 'Omzet',
+          achieved: ph.calculatedMetrics?.['revenue'] || 0,
+          target: ph.effectiveTargets?.['revenue'] || prog.monthly_target_rp || 0,
+          unit: 'Rp',
+          dataType: 'currency'
+        })
+      }
+      if ((prog.monthly_target_user || 0) > 0) {
+        unifiedPrimaryMetrics.push({
+          key: 'user_count',
+          label: 'User',
+          achieved: ph.calculatedMetrics?.['user_count'] || 0,
+          target: ph.effectiveTargets?.['user_count'] || prog.monthly_target_user || 0,
+          unit: 'user',
+          dataType: 'integer'
+        })
+      }
+    }
     
     const totalMilestones = prog.program_milestones?.length || 0
     const completedMilestones = prog.program_milestones?.filter(ms => 
@@ -108,10 +167,7 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     return {
       ...prog,
       health: ph,
-      achievementRp,
-      achievementUser,
-      percentageRp: prog.monthly_target_rp ? (achievementRp / prog.monthly_target_rp) * 100 : 0,
-      percentageUser: prog.monthly_target_user ? (achievementUser / prog.monthly_target_user) * 100 : 0,
+      unifiedPrimaryMetrics,
       qualitativePercentage,
       totalMilestones,
       completedMilestones,

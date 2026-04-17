@@ -1,8 +1,9 @@
 import { getDashboardData } from './actions'
 import { OverviewClient } from './dashboard-client'
 import { Suspense } from 'react'
-import { HeartPulse } from 'lucide-react'
+import { HeartPulse, Tv } from 'lucide-react'
 import { DashboardDateFilter } from '@/components/dashboard-date-filter'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,16 @@ export default async function DashboardPage({
             <HeartPulse className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-widest">Dashboard KPI</span>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ringkasan Kinerja</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ringkasan Kinerja</h1>
+            <Link 
+              href="/tv" 
+              className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-[#534AB7] hover:border-[#534AB7] hover:bg-[#EEEDFE] transition-all shadow-sm"
+              title="Dashboard TV"
+            >
+              <Tv className="h-5 w-5" />
+            </Link>
+          </div>
           <p className="text-sm text-slate-500">Pantau progres kinerja bisnis secara global.</p>
         </div>
 

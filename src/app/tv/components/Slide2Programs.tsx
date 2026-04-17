@@ -97,30 +97,32 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
       </div>
 
       <div className="space-y-4 relative z-10">
-        {/* Dynamic Metrics */}
-        {program.program_metric_definitions && program.program_metric_definitions.length > 0 ? (
-          program.program_metric_definitions
-            .filter(m => m.is_target_metric)
-            .slice(0, 2) // Max 2 metrics for grid card
-            .map(metric => (
-              <div key={metric.id} className="space-y-1.5">
+        {/* Unified Primary Metrics */}
+        {program.unifiedPrimaryMetrics.length > 0 ? (
+          program.unifiedPrimaryMetrics.slice(0, 2).map((metric) => {
+            const pct = metric.target > 0 ? (metric.achieved / metric.target) * 100 : 0
+            return (
+              <div key={metric.key} className="space-y-1.5">
                 <div className="flex justify-between items-end">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{metric.label}</span>
                   <span className="text-lg font-black text-slate-200">
-                    {metric.unit_label === 'Rp' ? formatRupiah((metric as { achieved?: number }).achieved || 0) : ((metric as { achieved?: number }).achieved || 0)}
-                    <span className="text-[10px] text-slate-500 ml-1">/ {metric.unit_label === 'Rp' ? formatRupiah(metric.monthly_target || 0) : (metric.monthly_target || 0)}</span>
+                    {metric.dataType === 'currency' ? formatRupiah(metric.achieved) : metric.achieved.toLocaleString()}
+                    <span className="text-[10px] text-slate-500 ml-1">
+                      / {metric.dataType === 'currency' ? formatRupiah(metric.target) : metric.target.toLocaleString()} {metric.unit}
+                    </span>
                   </span>
                 </div>
                 <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
                   <div 
                     className={cn("h-full transition-all duration-1000 rounded-full", barColors[program.health.status])}
-                    style={{ width: `${Math.min((metric as { percentage?: number }).percentage || 0, 100)}%` }}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
               </div>
-            ))
+            )
+          })
         ) : (
-          /* Fallback for Legacy or Qualitative */
+          /* Fallback for Qualitative Only */
           isQualitative ? (
             <div className="space-y-3">
                <div className="flex justify-between items-end">
@@ -138,44 +140,8 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
                </p>
             </div>
           ) : (
-            <div className="space-y-4">
-               {/* Target Rp */}
-               {(program.monthly_target_rp || 0) > 0 && (
-                 <div className="space-y-1.5">
-                    <div className="flex justify-between items-end">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Omzet</span>
-                       <span className="text-lg font-black text-slate-200">
-                         {formatRupiah(program.achievementRp)}
-                         <span className="text-[10px] text-slate-500 ml-1">/ {formatRupiah(program.monthly_target_rp || 0)}</span>
-                       </span>
-                    </div>
-                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                      <div 
-                        className={cn("h-full transition-all duration-1000 rounded-full", barColors[program.health.status])}
-                        style={{ width: `${Math.min(program.percentageRp, 100)}%` }}
-                      />
-                    </div>
-                 </div>
-               )}
-
-               {/* Target User */}
-               {(program.monthly_target_user || 0) > 0 && (
-                 <div className="space-y-1.5">
-                    <div className="flex justify-between items-end">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target User</span>
-                       <span className="text-lg font-black text-slate-200">
-                         {program.achievementUser.toLocaleString()}
-                         <span className="text-[10px] text-slate-500 ml-1">/ {(program.monthly_target_user || 0).toLocaleString()} user</span>
-                       </span>
-                    </div>
-                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                      <div 
-                        className={cn("h-full transition-all duration-1000 rounded-full", barColors[program.health.status])}
-                        style={{ width: `${Math.min(program.percentageUser, 100)}%` }}
-                      />
-                    </div>
-                 </div>
-               )}
+            <div className="py-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest italic opacity-50">
+              Menunggu data parameter...
             </div>
           )
         )}

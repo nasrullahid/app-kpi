@@ -159,7 +159,16 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
   if (primaryMetric) {
     chartLabel = `Tren Capaian ${primaryMetric.label}`
     chartMaxTarget = primaryMetric.monthly_target || 0
-    const mValues = (metricValues || []).filter(mv => mv.metric_definition_id === primaryMetric.id)
+    
+    // Robust filtering for metric values (try ID match, then metric_key fallback)
+    let mValues = (metricValues || []).filter(mv => mv.metric_definition_id === primaryMetric.id)
+    if (mValues.length === 0) {
+      mValues = (metricValues || []).filter(mv => {
+        const def = metricDefinitions.find(d => d.id === mv.metric_definition_id)
+        return def?.metric_key === primaryMetric.metric_key
+      })
+    }
+
     const sortedMValues = [...mValues].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     let cumulative = 0
@@ -172,12 +181,16 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
       }
     })
 
-    const targetPerDay = chartMaxTarget / 30
-    chartDataWithTarget = rawChartData.map((d, i) => ({
-      ...d,
-      targetIdeal: targetPerDay * (i + 1),
-    }))
-  } else {
+    if (rawChartData.length > 0) {
+      const targetPerDay = chartMaxTarget / 30
+      chartDataWithTarget = rawChartData.map((d, i) => ({
+        ...d,
+        targetIdeal: targetPerDay * (i + 1),
+      }))
+    }
+  } 
+  
+  if (chartDataWithTarget.length === 0) {
     // Legacy fallback using inputs
     const sortedInputs = [...inputs].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -201,20 +214,17 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
     }))
   }
 
-  // ── Derived values ──────────────────────────────────────────────────────────
-  // Gap calculations based on metric groups if available
-  const revenueMetric = tvMetrics.find(m => m.metric_group === 'revenue' && m.is_target_metric)
-  const userAcqMetric = tvMetrics.find(m => m.metric_group === 'user_acquisition' && m.is_target_metric)
+  // ── Derived values from Unified Metrics ─────────────────────────────────────
+  const revenueMetric = program.unifiedPrimaryMetrics.find(m => m.key === 'revenue')
+  const userAcqMetric = program.unifiedPrimaryMetrics.find(m => m.key === 'user_count' || m.key === 'user_acquisition')
 
-  const gapRp = revenueMetric 
-    ? Math.max(0, (revenueMetric.monthly_target || 0) - program.achievementRp)
-    : Math.max(0, (program.monthly_target_rp || 0) - program.achievementRp)
+  const achievementRp = revenueMetric?.achieved || 0
+  const targetRp = revenueMetric?.target || 0
+  const gapRp = Math.max(0, targetRp - achievementRp)
 
-  const gapUser = userAcqMetric
-    ? Math.max(0, (userAcqMetric.monthly_target || 0) - program.achievementUser)
-    : Math.max(0, (program.monthly_target_user || 0) - program.achievementUser)
-
-  const targetUserTotal = userAcqMetric ? (userAcqMetric.monthly_target || 0) : (program.monthly_target_user || 0)
+  const achievementUser = userAcqMetric?.achieved || 0
+  const targetUserTotal = userAcqMetric?.target || 0
+  const gapUser = Math.max(0, targetUserTotal - achievementUser)
 
   const motivationalMessage =
     program.health.healthScore >= 100
@@ -427,10 +437,9 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
               <div className={`grid gap-4 shrink-0 ${tvMetrics.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {hasCustomMetrics ? (
                   tvMetrics.map(metric => {
-                    const vals = metricValues.filter(mv => mv.metric_definition_id === metric.id)
-                    const achieved = vals.reduce((sum, mv) => sum + Number(mv.value || 0), 0)
-                    const target = Number(metric.monthly_target || 0)
-                    const pct = target > 0 ? Math.min((achieved / target) * 100, 100) : 0
+                    const achieved = program.health.calculatedMetrics?.[metric.metric_key] || 0
+                    const target = program.health.effectiveTargets?.[metric.metric_key] || (metric.monthly_target || 0)
+                    const pct = target > 0 ? (achieved / target) * 100 : 0
                     const isLower = metric.target_direction === 'lower_is_better'
 
                     return (
@@ -467,7 +476,7 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                 ) : (
                   <>
                     {/* Legacy Capital */}
-                    {(program.monthly_target_rp || 0) > 0 && (
+                    {targetRp > 0 && (
                       <Card className="p-5 flex flex-col justify-between" accentColor="#00d4ff">
                         <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">
                           Target Capital (RP)
@@ -477,22 +486,22 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                             className="text-[min(2rem,15cqw)] font-black text-white whitespace-nowrap leading-none mb-1"
                             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
                           >
-                            {formatRupiah(program.achievementRp)}
+                            {formatRupiah(achievementRp)}
                           </div>
                           <div className="text-[10px] text-slate-500 uppercase mb-3">
-                            Budget: {formatRupiah(program.monthly_target_rp || 0)}
+                            Budget: {formatRupiah(targetRp)}
                           </div>
                         </div>
-                        <ProgressBar pct={(program.achievementRp / (program.monthly_target_rp || 1)) * 100} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
+                        <ProgressBar pct={(achievementRp / (targetRp || 1)) * 100} color="linear-gradient(90deg, #00aacc, #00d4ff)" />
                         <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
                           <span>Pencapaian</span>
-                          <span className="text-cyan-400 font-bold">{((program.achievementRp / (program.monthly_target_rp || 1)) * 100).toFixed(1)}%</span>
+                          <span className="text-cyan-400 font-bold">{((achievementRp / (targetRp || 1)) * 100).toFixed(1)}%</span>
                         </div>
                       </Card>
                     )}
 
                     {/* Legacy Users */}
-                    {(program.monthly_target_user || 0) > 0 && (
+                    {targetUserTotal > 0 && (
                       <Card className="p-5 flex flex-col justify-between" accentColor="#00ff9d">
                         <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">
                           User Acquisition
@@ -502,16 +511,16 @@ export function SlideProgramDetail({ program, inputs, metricDefinitions = [], me
                             className="text-[min(2rem,15cqw)] font-black whitespace-nowrap leading-none mb-1"
                             style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#00ff9d' }}
                           >
-                            {program.achievementUser.toLocaleString()}
+                            {achievementUser.toLocaleString()}
                           </div>
                           <div className="text-[10px] text-slate-500 uppercase mb-3">
-                            Goal: {(program.monthly_target_user || 0).toLocaleString()} user
+                            Goal: {targetUserTotal.toLocaleString()} user
                           </div>
                         </div>
-                        <ProgressBar pct={(program.achievementUser / (program.monthly_target_user || 1)) * 100} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
+                        <ProgressBar pct={(achievementUser / (targetUserTotal || 1)) * 100} color="linear-gradient(90deg, #00cc7e, #00ff9d)" />
                         <div className="text-[10px] text-slate-500 mt-1.5 flex justify-between">
                           <span>Pencapaian</span>
-                          <span className="text-emerald-400 font-bold">{((program.achievementUser / (program.monthly_target_user || 1)) * 100).toFixed(1)}%</span>
+                          <span className="text-emerald-400 font-bold">{((achievementUser / (targetUserTotal || 1)) * 100).toFixed(1)}%</span>
                         </div>
                       </Card>
                     )}
