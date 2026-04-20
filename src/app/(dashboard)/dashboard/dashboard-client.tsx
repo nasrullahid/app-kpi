@@ -929,7 +929,7 @@ export function OverviewClient({
                       <Line yAxisId="right" type="monotone" dataKey="actualUser" name="User Harian" stroke="#378ADD" strokeWidth={3} dot={{ r: 4, fill: '#378ADD' }} activeDot={{ r: 6 }} />
                       
                       {omzetSummary.targetTrend && omzetSummary.targetTrend.length > 0 && (
-                        <ReferenceLine yAxisId="left" y={omzetSummary.targetTrend[0].targetRevenue} stroke="#639922" strokeDasharray="5 5" label={{ position: 'right', value: 'Target Harian', fill: '#639922', fontSize: 10 }} />
+                        <ReferenceLine yAxisId="left" y={(omzetSummary.aggregates.revenue as AggregateItem)?.requiredDaily || 0} stroke="#639922" strokeDasharray="5 5" label={{ position: 'right', value: 'Target Harian Dibutuhkan', fill: '#639922', fontSize: 10 }} />
                       )}
                     </ComposedChart>
                   </ResponsiveContainer>
