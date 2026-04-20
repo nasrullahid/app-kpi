@@ -428,11 +428,10 @@ export function isAdsProgram(metrics: MetricDefinition[]): boolean {
   // Exclude MoU programs as they have their own tab
   if (isMouProgram(metrics)) return false
 
-  // Include if it has specific ads metrics OR if it has primary target metrics (Legacy)
+  // Include if it has specific ads metrics
   return metrics.some(m => 
-    (['ad_spend', 'ads_spent', 'roas', 'cpp'].includes(m.metric_group || '')) ||
-    (['ads_spent', 'ad_spend', 'roas', 'cpp', 'budget_iklan'].includes(m.metric_key)) ||
-    (m.is_primary && m.is_target_metric)
+    m.metric_group === 'ad_spend' ||
+    ['ads_spent', 'leads', 'roas', 'cpp', 'cpm', 'cpc', 'adds_to_cart', 'conversion_rate', 'cost_per_goal'].includes(m.metric_key)
   )
 }
 

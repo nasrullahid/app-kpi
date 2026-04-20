@@ -7,7 +7,6 @@ import { formatRupiah, cn } from '@/lib/utils'
 import { upsertSingleMetricValue, upsertDailyMetricTarget, autoDistributeTargets } from './actions'
 import { toast } from 'sonner'
 import { Loader2, Calculator, Target, Info, Sparkles, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
-import { isAdsProgram } from '@/lib/dashboard-calculator'
 
 type MetricDefinition = Database['public']['Tables']['program_metric_definitions']['Row']
 type MetricValue = Database['public']['Tables']['daily_metric_values']['Row']
@@ -457,11 +456,8 @@ export function PivotTableClient({
       )}
 
       {(() => {
-        const isAds = isAdsProgram(activeProgram.program_metric_definitions || []);
-        const isQuantitative = activeProgram.target_type === 'quantitative' || activeProgram.target_type === 'hybrid';
-        
-        // Use legacy table view for quantitative programs that aren't Ads-heavy
-        if ((isQuantitative && !isAds) || metrics.length === 0) {
+        // Fallback to legacy block if no metrics are defined at all
+        if (metrics.length === 0) {
           return (
             <div className="relative overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
               <table className="w-full text-sm text-left">
