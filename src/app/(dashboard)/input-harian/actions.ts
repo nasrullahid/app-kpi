@@ -89,12 +89,16 @@ export async function updateDailyInput(id: string, data: {
   const isLocked = (currentInput?.periods as unknown as { is_locked: boolean | null })?.is_locked
   if (isLocked) return { error: 'Periode untuk data ini sudah dikunci oleh Admin.' }
 
-  // Must only update their own records (enforced by RLS as well as code check if needed)
-  const { error } = await supabase
-    .from('daily_inputs')
-    .update(data)
-    .eq('id', id)
-    .eq('created_by', user.id) // secondary lock
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
+
+  let query = supabase.from('daily_inputs').update(data).eq('id', id)
+  
+  if (!isAdmin) {
+    query = query.eq('created_by', user.id)
+  }
+
+  const { error } = await query
 
   if (error) {
     console.error('Update Input Error:', error)
@@ -121,11 +125,15 @@ export async function deleteDailyInput(id: string): Promise<ActionResponse> {
   const isLocked = (currentInput?.periods as unknown as { is_locked: boolean | null })?.is_locked
   if (isLocked) return { error: 'Periode untuk data ini sudah dikunci oleh Admin.' }
 
-  const { error } = await supabase
-    .from('daily_inputs')
-    .delete()
-    .eq('id', id)
-    .eq('created_by', user.id)
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
+
+  let query = supabase.from('daily_inputs').delete().eq('id', id)
+  if (!isAdmin) {
+    query = query.eq('created_by', user.id)
+  }
+
+  const { error } = await query
 
   if (error) {
     return { error: error.message }
