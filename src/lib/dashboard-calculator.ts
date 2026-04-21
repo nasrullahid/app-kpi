@@ -55,32 +55,59 @@ export function calculateProgramHealth(
 
   // 1. Calculate All Metrics using evaluateAllMetrics pipeline
   const manualValues: Record<string, number | null> = {}
-  
-  // Aggregate manual values (SUM) from daily_metric_values table
-  metrics.filter(m => m.input_type === 'manual').forEach(m => {
-    const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
-    // Only set if we actually have meaningful values for this metric in this period
-    if (vals.length > 0 && vals.some(v => v.value !== null)) {
-      manualValues[m.metric_key] = vals.reduce((sum, v) => sum + (v.value || 0), 0)
-    }
-  })
-
-  // ── RE-INTRODUCTION OF LEGACY ACHIEVEMENT FALLBACK ─────────────────────────
-  // If we have 0/null in revenue/omzet or user_count/closing from metrics, check daily_inputs
   const legacyInputs = dailyInputsByProgram.get(program.id) || []
   
-  const legacyRpSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_rp || 0), 0)
-  if (legacyRpSum > 0) {
-    if (!manualValues['revenue'] || manualValues['revenue'] === 0) manualValues['revenue'] = legacyRpSum
-    if (!manualValues['omzet'] || manualValues['omzet'] === 0) manualValues['omzet'] = legacyRpSum
-  }
+  // Aggregate manual values (SUM) from daily_metric_values table WITH Date-Level Legacy Fallback
+  metrics.filter(m => m.input_type === 'manual').forEach(m => {
+    const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
+    const k = m.metric_key?.toLowerCase()
+    
+    // Check if this metric qualifies for legacy fallback (Revenue or User Acquisition)
+    const isRevenue = m.metric_group === 'revenue' || k === 'revenue' || k === 'omzet'
+    const isAcquisition = m.metric_group === 'user_acquisition' || k === 'user_count' || k === 'closing'
 
-  const legacyUserSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_user || 0), 0)
-  if (legacyUserSum > 0) {
-    if (!manualValues['user_count'] || manualValues['user_count'] === 0) manualValues['user_count'] = legacyUserSum
-    if (!manualValues['closing'] || manualValues['closing'] === 0) manualValues['closing'] = legacyUserSum
-  }
-  // ───────────────────────────────────────────────────────────────────────────
+    if (isRevenue || isAcquisition) {
+      // DATE-LEVEL MERGING LOGIC (Matches Pivot Table 0-fallback)
+      const legacyField = isRevenue ? 'achievement_rp' : 'achievement_user'
+      
+      const allDates = new Set([
+        ...vals.map(v => v.date),
+        ...legacyInputs.filter(li => Number(li[legacyField] || 0) > 0).map(li => li.date)
+      ])
+
+      let unifiedSum = 0
+      let hasData = false
+      
+      allDates.forEach(date => {
+        const modern = vals.find(v => v.date === date)
+        const modernVal = Number(modern?.value || 0)
+
+        // FALLBACK LOGIC: Take legacy if modern value is missing OR exactly 0
+        if (modernVal > 0) {
+          unifiedSum += modernVal
+          hasData = true
+        } else {
+          const legacy = legacyInputs.find(li => li.date === date)
+          if (legacy) {
+            unifiedSum += Number(legacy[legacyField] || 0)
+            hasData = true
+          } else if (modern) {
+            // Include explicit 0 if no legacy exists for that date
+            hasData = true
+          }
+        }
+      })
+
+      if (hasData) {
+        manualValues[m.metric_key] = unifiedSum
+      }
+    } else {
+      // Standard local-only aggregation
+      if (vals.length > 0 && vals.some(v => v.value !== null)) {
+        manualValues[m.metric_key] = vals.reduce((sum, v) => sum + (v.value || 0), 0)
+      }
+    }
+  })
 
   // Pre-load baseline and target metrics for formulas
   metrics.forEach(m => {
@@ -280,61 +307,75 @@ export function aggregateByMetricGroup(
     
     // Group definitions by category
     const getProgValue = (group: string, keys: string[]) => {
-      let customSum = 0
       let customTarget = 0
       let customAbsolute = 0
-      let foundCustom = false
+      let foundData = false
+      
+      const legacyInputs = dailyInputsByProgram.get(prog.id) || []
+      const legacyField = (group === 'revenue' || keys.includes('revenue')) ? 'achievement_rp' : 'achievement_user'
+      const isAdsRelated = group === 'revenue' || group === 'user_acquisition' || group === 'leads' || keys.includes('user_count') || keys.includes('revenue')
 
-      definitions.forEach(m => {
-        const k = m.metric_key?.toLowerCase()
-        const match = m.metric_group === group || keys.includes(k)
-        if (match) {
-          const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
-          foundCustom = true
-          customSum += vals.reduce((s, v) => s + (Number(v.value) || 0), 0)
-          
-          const sumCustomTarget = vals.reduce((s, v) => s + (Number(v.target_value) || 0), 0)
-          customTarget += sumCustomTarget
-          
-          let mTarget = m.monthly_target || 0
-          
-          // Fallback to program-level target if metric definition is uninitialized (0)
-          if (mTarget === 0) {
-            if (m.metric_group === 'revenue' || keys.includes('revenue')) {
-              mTarget = (prog as unknown as { monthly_target_rp: number }).monthly_target_rp || 0
-            } else if (m.metric_group === 'user_acquisition' || keys.includes('user_count')) {
-              mTarget = (prog as unknown as { monthly_target_user: number }).monthly_target_user || 0
-            }
+      // Identify relevant modern metrics
+      const relevantDefs = definitions.filter(m => m.metric_group === group || keys.includes(m.metric_key?.toLowerCase()))
+      
+      // Values grouped by date for this program and metric category
+      const modernValuesByDate = new Map<string, number>()
+      
+      relevantDefs.forEach(m => {
+        const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
+        if (vals.length > 0) foundData = true
+        
+        vals.forEach(v => {
+          const current = modernValuesByDate.get(v.date) || 0
+          modernValuesByDate.set(v.date, current + (Number(v.value) || 0))
+        })
+
+        // Target calculation
+        const sumCustomTarget = vals.reduce((s, v) => s + (Number(v.target_value) || 0), 0)
+        customTarget += sumCustomTarget
+        
+        let mTarget = m.monthly_target || 0
+        if (mTarget === 0) {
+          if (m.metric_group === 'revenue' || keys.includes('revenue')) {
+            mTarget = (prog as unknown as { monthly_target_rp: number }).monthly_target_rp || 0
+          } else if (m.metric_group === 'user_acquisition' || keys.includes('user_count')) {
+            mTarget = (prog as unknown as { monthly_target_user: number }).monthly_target_user || 0
           }
+        }
+        const absTarget = (m.monthly_target || 0) === 0 && sumCustomTarget > 0 
+          ? sumCustomTarget / prorationFactor 
+          : mTarget
+        customAbsolute += absTarget
+      })
 
-          // Important: Reconstruct absolute target from periodized targets if monthly is 0
-          const absTarget = (m.monthly_target || 0) === 0 && sumCustomTarget > 0 
-            ? sumCustomTarget / prorationFactor 
-            : mTarget
+      // Collect dates from both sources
+      const allDates = new Set([
+        ...Array.from(modernValuesByDate.keys()),
+        ...(isAdsRelated ? legacyInputs.filter(li => Number(li[legacyField] || 0) > 0).map(li => li.date) : [])
+      ])
 
-          customAbsolute += absTarget
+      let unifiedSum = 0
+      allDates.forEach(date => {
+        const modernVal = modernValuesByDate.get(date)
+        
+        // 0-FALLBACK Logic: Use legacy if modern is missing OR exactly 0
+        if (modernVal !== undefined && modernVal > 0) {
+          unifiedSum += modernVal
+          foundData = true
+        } else if (isAdsRelated) {
+          const legacy = legacyInputs.find(li => li.date === date)
+          if (legacy) {
+            unifiedSum += Number(legacy[legacyField] || 0)
+            foundData = true
+          } else if (modernVal !== undefined) {
+            // Keep the 0 if it's there but no legacy fallback exists for that date
+            unifiedSum += modernVal
+            foundData = true
+          }
         }
       })
 
-      // LEGACY FALLBACK for aggregation
-      if (customSum === 0) {
-        const legacyInputs = dailyInputsByProgram.get(prog.id) || []
-        if (group === 'revenue' || keys.includes('revenue')) {
-          const lSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_rp || 0), 0)
-          if (lSum > 0) {
-            customSum = lSum
-            foundCustom = true
-          }
-        } else if (group === 'user_acquisition' || keys.includes('user_count')) {
-          const lSum = legacyInputs.reduce((sum, i) => sum + Number(i.achievement_user || 0), 0)
-          if (lSum > 0) {
-            customSum = lSum
-            foundCustom = true
-          }
-        }
-      }
-      
-      return { actual: customSum, target: customTarget, absolute: customAbsolute, found: foundCustom }
+      return { actual: unifiedSum, target: customTarget, absolute: customAbsolute, found: foundData }
     }
 
     const rev = getProgValue('revenue', ['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic'])
@@ -481,32 +522,48 @@ export function aggregateAdsMetrics(
     const defs = prog.program_metric_definitions || []
     const progMetricValues = metricValuesByProgram.get(prog.id) || []
 
-    defs.forEach(m => {
-      const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
-      const sum = vals.reduce((acc, v) => acc + (Number(v.value) || 0), 0)
+    const legacyInputs = dailyInputsByProgram?.get(prog.id) || []
 
-      const g = m.metric_group
-      const k = m.metric_key?.toLowerCase()
+    const getAdsUnifiedSum = (group: string, keys: string[], legacyField?: 'achievement_rp' | 'achievement_user'): number => {
+      const relevantDefs = defs.filter(m => m.metric_group === group || keys.includes(m.metric_key?.toLowerCase()))
+      const modernByDate = new Map<string, number>()
+      
+      relevantDefs.forEach(m => {
+        const vals = progMetricValues.filter(mv => mv.metric_definition_id === m.id)
+        vals.forEach(v => {
+          const current = modernByDate.get(v.date) || 0
+          modernByDate.set(v.date, current + (Number(v.value) || 0))
+        })
+      })
 
-      if (g === 'ad_spend' || k === 'ads_spent' || k === 'ad_spend' || k === 'budget_iklan' || k === 'spent') {
-        totalAdsSpent += sum
-      } else if (g === 'revenue' || k === 'revenue' || k === 'omzet' || k === 'pemasukan' || k === 'revenue_from_paid_traffic') {
-        totalRevenue += sum
-      } else if (g === 'user_acquisition' || k === 'user_count' || k === 'closing' || k === 'leads_converted' || k === 'pembelian') {
-        totalGoals += sum
-      } else if (g === 'leads' || k === 'leads' || k === 'lead_masuk' || k === 'prospek' || k === 'leads_count') {
-        totalLeads += sum
-      }
-    })
+      const allDates = new Set([
+        ...Array.from(modernByDate.keys()),
+        ...(legacyField ? legacyInputs.filter(li => Number(li[legacyField] || 0) > 0).map(li => li.date) : [])
+      ])
 
-    // If no goals from modern metrics, fallback to legacy achievement_user ONLY IF it's an ads program
-    if (totalGoals === 0 && isAdsProgram(defs)) {
-      const legacyInputs = dailyInputsByProgram?.get(prog.id) || []
-      const lGoals = legacyInputs.reduce((sum: number, i: Database['public']['Tables']['daily_inputs']['Row']) => sum + Number(i.achievement_user || 0), 0)
-      const lRev = legacyInputs.reduce((sum: number, i: Database['public']['Tables']['daily_inputs']['Row']) => sum + Number(i.achievement_rp || 0), 0)
-      totalGoals += lGoals
-      totalRevenue += lRev
+      let unified = 0
+      allDates.forEach(date => {
+        const modernVal = modernByDate.get(date)
+        
+        // Match pivot table fallback logic (0-fallback)
+        if (modernVal !== undefined && modernVal > 0) {
+          unified += modernVal
+        } else if (legacyField) {
+          const legacy = legacyInputs.find(li => li.date === date)
+          if (legacy) {
+            unified += Number(legacy[legacyField] || 0)
+          } else if (modernVal !== undefined) {
+            unified += modernVal
+          }
+        }
+      })
+      return unified
     }
+
+    totalAdsSpent += getAdsUnifiedSum('ad_spend', ['ads_spent', 'ad_spend', 'budget_iklan', 'spent'])
+    totalRevenue += getAdsUnifiedSum('revenue', ['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic'], 'achievement_rp')
+    totalGoals += getAdsUnifiedSum('user_acquisition', ['user_count', 'closing', 'leads_converted', 'pembelian'], 'achievement_user')
+    totalLeads += getAdsUnifiedSum('leads', ['leads', 'lead_masuk', 'prospek', 'leads_count'])
   })
 
   return {
