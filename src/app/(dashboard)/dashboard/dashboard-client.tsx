@@ -54,6 +54,19 @@ interface OverviewClientProps {
 
 type TabType = 'overview' | 'target' | 'ads' | 'mou'
 
+const PROGRAM_COLORS = [
+  '#534AB7', // Main Purple
+  '#10B981', // Emerald
+  '#378ADD', // Blue
+  '#F43F5E', // Rose
+  '#F59E0B', // Amber
+  '#8B5CF6', // Violet
+  '#EC4899', // Pink
+  '#06B6D4', // Cyan
+  '#F97316', // Orange
+  '#6366F1', // Indigo
+];
+
 // ── Status helpers ───────────────────────────────────────────────────────────
 function getStatusLabelAndColor(score: number): { label: string; dot: string; badge: string, accent: string } {
   if (score >= 100) return { label: 'Excellent', dot: 'bg-blue-500',   badge: 'text-blue-700 bg-blue-50 border-blue-200',   accent: '#FCD34D' } // Gold/Excellent
@@ -125,7 +138,14 @@ function KpiCard({ icon: Icon, label, value, sub, accentColor, comparison, toolt
           )}>
             {comp.status === 'ahead' ? 'On Track' : comp.status === 'behind' ? 'Behind' : 'Steady'}
           </span>
-          <span className="text-[12px] text-slate-400">{comp.label}</span>
+          <span className="text-[12px] text-slate-400" title={comp.percentage ? `Target progres ideal saat ini: ${comp.percentage.toFixed(1)}%` : undefined}>
+            {comp.label}
+            {comp.percentage !== undefined && comp.percentage !== null && (
+              <span className="ml-1 text-[11px] font-bold text-slate-600">
+                ({Math.round(comp.percentage)}%)
+              </span>
+            )}
+          </span>
         </div>
       )
     }
@@ -477,6 +497,27 @@ export function OverviewClient({
     targetTrend: summary.targetTrend, 
     previousAggregates: previousSummary?.aggregates 
   }
+
+  const revenueBreakdown = useMemo(() => {
+    if (selectedOmzetProgramId !== 'all') {
+      const ph = summary.programHealths.find(h => h.programId === selectedOmzetProgramId)
+      if (!ph) return []
+      return [{
+        name: ph.program.name,
+        value: ph.calculatedMetrics?.revenue || 0,
+        color: PROGRAM_COLORS[0]
+      }].filter(item => item.value > 0)
+    }
+
+    return summary.programHealths
+      .map((ph, index) => ({
+        name: ph.program.name,
+        value: ph.calculatedMetrics?.revenue || 0,
+        color: PROGRAM_COLORS[index % PROGRAM_COLORS.length]
+      }))
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [summary.programHealths, selectedOmzetProgramId]);
   const [metricX, setMetricX] = useState('ads_spent')
   const [metricY, setMetricY] = useState('roas')
 
@@ -916,14 +957,15 @@ export function OverviewClient({
              <div className="lg:col-span-4 gap-6">
                 <RadialProgressCard 
                   title="Revenue Progress"
-                  value={(omzetSummary.aggregates.revenue as AggregateItem)?.actual || 0}
-                  target={(omzetSummary.aggregates.revenue as AggregateItem)?.totalTarget || 0}
-                  percentage={((omzetSummary.aggregates.revenue as AggregateItem)?.actual / ((omzetSummary.aggregates.revenue as AggregateItem)?.totalTarget || 1)) * 100}
-                  displayValue={formatRupiah((omzetSummary.aggregates.revenue as AggregateItem)?.actual || 0)}
-                  displayTarget={formatRupiah((omzetSummary.aggregates.revenue as AggregateItem)?.totalTarget || 0)}
+                  value={omzetSummary.aggregates.revenue?.actual || 0}
+                  target={omzetSummary.aggregates.revenue?.totalTarget || 0}
+                  percentage={(omzetSummary.aggregates.revenue?.actual / (omzetSummary.aggregates.revenue?.totalTarget || 1)) * 100}
+                  displayValue={formatRupiah(omzetSummary.aggregates.revenue?.actual || 0)}
+                  displayTarget={formatRupiah(omzetSummary.aggregates.revenue?.totalTarget || 0)}
                   unitLabel="Rp"
                   color="#639922"
                   className="h-full"
+                  breakdown={revenueBreakdown}
                 />
              </div>
 

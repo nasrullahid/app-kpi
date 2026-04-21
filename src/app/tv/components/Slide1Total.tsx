@@ -80,7 +80,7 @@ export function Slide1Total({ data }: Slide1Props) {
           {activeGroups.map(key => {
             const group = aggregate.metricGroups[key];
             const config = groupConfig[key];
-            const pct = group.target > 0 ? (group.actual / group.target) * 100 : 0;
+            const pct = group.totalTarget > 0 ? (group.actual / group.totalTarget) * 100 : 0;
             const Icon = config.icon;
 
             return (
@@ -99,7 +99,7 @@ export function Slide1Total({ data }: Slide1Props) {
                   </div>
                   {group.target > 0 && (
                     <div className="text-sm font-bold text-slate-500 uppercase mt-2">
-                      Target Bulanan: {config.isCurrency ? formatRupiah(group.target) : group.target.toLocaleString()}
+                      Target Bulanan: {config.isCurrency ? formatRupiah(group.totalTarget) : group.totalTarget.toLocaleString()}
                     </div>
                   )}
                 </div>
