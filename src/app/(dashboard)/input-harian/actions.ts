@@ -21,6 +21,29 @@ async function checkAccess(supabase: SupabaseClient<Database>, userId: string, p
   return !!data
 }
 
+async function resolveCreatorId(supabase: SupabaseClient<Database>, userId: string, programId: string): Promise<string> {
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  if (profile?.role !== 'admin') return userId
+
+  // If Admin, try to attribute to the program's primary PIC
+  const { data: program } = await supabase
+    .from('programs')
+    .select('pic_id')
+    .eq('id', programId)
+    .single()
+
+  if (program?.pic_id) return program.pic_id
+
+  const { data: pic } = await supabase
+    .from('program_pics')
+    .select('profile_id')
+    .eq('program_id', programId)
+    .limit(1)
+    .maybeSingle()
+
+  return pic?.profile_id || userId
+}
+
 export async function submitDailyInput(data: {
   program_id: string
   date: string
@@ -49,10 +72,13 @@ export async function submitDailyInput(data: {
   if (!period) return { error: 'Tidak ada periode aktif saat ini. Hubungi Admin.' }
   if (period.is_locked) return { error: 'Periode ini sudah dikunci oleh Admin. Data tidak dapat ditambah.' }
 
+  // Resolve who gets credit (Admin inputs -> PIC)
+  const creatorId = await resolveCreatorId(supabase, user.id, data.program_id)
+
   const payload = {
     ...data,
     period_id: period.id,
-    created_by: user.id
+    created_by: creatorId
   }
 
   const { error } = await supabase.from('daily_inputs').insert(payload)
@@ -229,6 +255,9 @@ export async function submitDailyMetricValues(
   if (!period) return { error: 'Tidak ada periode aktif saat ini.' }
   if (period.is_locked) return { error: 'Periode ini sudah dikunci oleh Admin.' }
 
+  // Resolve creator ID (Admin -> PIC)
+  const creatorId = await resolveCreatorId(supabase, user.id, programId)
+
   // Verify access
   const hasAccess = await checkAccess(supabase, user.id, programId)
   if (!hasAccess) return { error: 'Anda tidak memiliki akses ke program ini.' }
@@ -239,7 +268,7 @@ export async function submitDailyMetricValues(
     metric_definition_id: v.metric_definition_id,
     date,
     value: v.value,
-    created_by: user.id,
+    created_by: creatorId,
   }))
 
   const { error } = await supabase
@@ -278,6 +307,9 @@ export async function upsertSingleMetricValue(params: {
   if (!period) return { error: 'Tidak ada periode aktif saat ini.' }
   if (period.is_locked) return { error: 'Periode ini sudah dikunci oleh Admin.' }
 
+  // Resolve creator ID (Admin -> PIC)
+  const creatorId = await resolveCreatorId(supabase, user.id, params.programId)
+
   // Verify access
   const hasAccess = await checkAccess(supabase, user.id, params.programId)
   if (!hasAccess) return { error: 'Anda tidak memiliki akses ke program ini.' }
@@ -288,7 +320,7 @@ export async function upsertSingleMetricValue(params: {
     metric_definition_id: params.metricDefinitionId,
     date: params.date,
     value: params.value,
-    created_by: user.id,
+    created_by: creatorId,
   }
 
   const { error } = await supabase

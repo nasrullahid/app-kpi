@@ -76,7 +76,8 @@ function getBannerInfo(score: number) {
   if (score < 60)  return { text: 'Masih ada waktu — tingkatkan intensitas! 🔥', bg: 'bg-orange-50', border: 'border-orange-200', textCol: 'text-orange-800' }
   if (score < 80)  return { text: 'Progres bagus — jangan kendur! 🎯', bg: 'bg-blue-50', border: 'border-blue-200', textCol: 'text-blue-800' }
   if (score < 100) return { text: 'Hampir sampai — satu langkah lagi! 🚀', bg: 'bg-indigo-50', border: 'border-[#EEEDFE]', textCol: 'text-[#534AB7]' }
-  return { text: 'Target tercapai — luar biasa! 🏆', bg: 'bg-emerald-50', border: 'border-emerald-200', textCol: 'text-emerald-800' }
+  if (score < 105) return { text: 'ALHAMDULILLAH TARGET TERCAPAI 🏆', bg: 'bg-emerald-50', border: 'border-emerald-200', textCol: 'text-emerald-800' }
+  return { text: 'MASYAALLAH WOW TARGET TERLAMPAUI! 🚀', bg: 'bg-blue-50', border: 'border-blue-200', textCol: 'text-blue-800' }
 }
 
 

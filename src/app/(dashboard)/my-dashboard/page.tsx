@@ -20,11 +20,15 @@ export default async function MyDashboardPage({
     redirect('/login')
   }
 
-  await supabase
+  const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('role')
     .eq('id', user.id)
     .single()
+
+  if (profile?.role === 'admin') {
+    redirect('/dashboard')
+  }
 
   // We intentionally force isAdmin to false here so it ONLY fetches programs PIC is assigned to
   const data = await getUnifiedDashboardData({
