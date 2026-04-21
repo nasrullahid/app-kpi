@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/login/actions'
-
+import Image from 'next/image'
 interface LocalProfile {
   id: string
   name: string
@@ -70,8 +70,8 @@ export function Sidebar({ profile, userEmail, isCollapsed, setIsCollapsed }: Sid
       >
         <div className="h-20 flex items-center px-4 border-b border-[#E5E7EB]">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="bg-[#534AB7] text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xl shrink-0">
-              DT
+            <div className="flex items-center justify-center font-bold text-xl shrink-0">
+              <Image src="/logo/logoKPI.png" alt="Logo" width={30} height={30} />
             </div>
             {!isCollapsed && (
               <span className="font-semibold text-lg text-[#111827] truncate animate-in fade-in duration-500 whitespace-nowrap">

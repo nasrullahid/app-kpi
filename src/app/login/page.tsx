@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { login } from './actions'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -38,8 +39,8 @@ export default function LoginPage() {
 
           {/* Brand */}
           <div className="relative z-10">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-sm font-medium tracking-wide text-white">
-              DT
+            <div className="flex items-center justify-center">
+              <Image src="/logo/logoKPI.png" alt="Logo" width={50} height={50} className='opacity-20' />    
             </div>
 
             <div className="mt-10">
