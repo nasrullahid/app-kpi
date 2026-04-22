@@ -19,7 +19,7 @@ import { exportDashboardToExcel } from '@/lib/export-spreadsheet'
 import { formatMetricValue } from '@/lib/formula-evaluator'
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, ComposedChart, Legend, Line, AreaChart, Area, Cell, ReferenceLine
+  BarChart, Bar, ComposedChart, Legend, Line, Area, Cell, ReferenceLine
 } from 'recharts'
 import {
   HeartPulse, Layers, Target, CheckSquare,
@@ -943,7 +943,8 @@ export function OverviewClient({
                         <Tooltip 
                           contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none' }} 
                           itemStyle={{ fontWeight: 600, fontSize: 12 }}
-                          formatter={(v: any, name: any) => [formatRupiah(Number(v)), name === 'actualRevenue' ? 'Kumulatif Aktual' : 'Target Linear']}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          formatter={(v: any, name: any) => [formatRupiah(Number(v || 0)), name === 'actualRevenue' ? 'Kumulatif Aktual' : 'Target Linear']}
                         />
                         <Legend verticalAlign="top" height={36} iconType="circle" />
                         <Line type="monotone" dataKey="targetRevenue" name="Target Linear" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
@@ -968,9 +969,16 @@ export function OverviewClient({
                         <Tooltip 
                             cursor={{ fill: '#f8fafc' }} 
                             contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none' }} 
-                            formatter={(val: number) => [`${val.toFixed(1)}%`, 'Capaian Omzet']}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            formatter={(val: any) => [`${Number(val).toFixed(1)}%`, 'Capaian Omzet']}
                         />
-                        <Bar dataKey="achievementPct" radius={[0, 4, 4, 0]} maxBarSize={20} label={{ position: 'right', formatter: (val: number) => Math.round(val) + '%' }}>
+                        <Bar 
+                          dataKey="achievementPct" 
+                          radius={[0, 4, 4, 0]} 
+                          maxBarSize={20} 
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          label={{ position: 'right', formatter: (val: any) => val !== undefined ? Math.round(Number(val)) + '%' : '' }}
+                        >
                           {capaianProgramData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
