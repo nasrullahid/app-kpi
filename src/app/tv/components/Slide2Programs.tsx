@@ -43,18 +43,14 @@ function ProgramCard({ program }: { program: ProgramPerformance }) {
   const isQualitative = program.target_type === 'qualitative'
 
   const statusColors: Record<string, string> = {
-    'EXCELLENT': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
-    'BAIK': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-    'CUKUP': 'text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.2)]',
-    'PERLU PERHATIAN': 'text-rose-400 bg-rose-500/10 border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.2)]',
+    'SEHAT': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
+    'PERHATIAN': 'text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.2)]',
     'KRITIS': 'text-rose-400 bg-rose-600/20 border-rose-600/50 shadow-[0_0_20px_rgba(244,63,94,0.4)]'
   }
 
   const barColors: Record<string, string> = {
-    'EXCELLENT': 'bg-emerald-500',
-    'BAIK': 'bg-emerald-500',
-    'CUKUP': 'bg-amber-500',
-    'PERLU PERHATIAN': 'bg-rose-500',
+    'SEHAT': 'bg-emerald-500',
+    'PERHATIAN': 'bg-amber-500',
     'KRITIS': 'bg-rose-600'
   }
 

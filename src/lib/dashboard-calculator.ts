@@ -426,7 +426,8 @@ export function aggregateByMetricGroup(
         value: actual,
         type: 'target',
         label: 'vs expected progress',
-        status: actualProgress >= prorationFactor ? 'ahead' : 'behind'
+        status: actualProgress >= prorationFactor ? 'ahead' : 'behind',
+        percentage: prorationFactor * 100
       } : undefined
 
       result[g] = { actual, target, totalTarget, isComputed: false, comparison }

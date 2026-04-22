@@ -54,7 +54,7 @@ export interface TVDashboardData {
   activePeriod: Period | null
   aggregate: {
     healthScore: number
-    metricGroups: Record<string, { actual: number, target: number, isComputed: boolean }>
+    metricGroups: Record<string, { actual: number, target: number, totalTarget: number, isComputed: boolean }>
     tercapai: number
     menujuTarget: number
     perluPerhatian: number
@@ -250,7 +250,7 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     activePeriod: data.activePeriod,
     aggregate: {
       healthScore: data.summary.overallHealth,
-      metricGroups: data.summary.aggregates as Record<string, { actual: number; target: number; isComputed: boolean }>,
+      metricGroups: data.summary.aggregates as Record<string, { actual: number; target: number; totalTarget: number; isComputed: boolean }>,
       tercapai: data.summary.statusCounts.tercapai,
       menujuTarget: data.summary.statusCounts.menujuTarget,
       perluPerhatian: data.summary.statusCounts.perluPerhatian
