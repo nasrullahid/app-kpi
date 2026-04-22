@@ -385,6 +385,7 @@ export function OverviewClient({
   const [filterDept, setFilterDept] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy] = useState<'health' | 'name'>('health')
+  const [capaianMode, setCapaianMode] = useState<'health' | 'target'>('health')
 
   // Ads Specific States
   const [selectedAdsProgramId, setSelectedAdsProgramId] = useState('all')
@@ -633,19 +634,39 @@ export function OverviewClient({
 
   const capaianProgramData = useMemo(() => {
     return [...programHealths]
-      .filter(ph => (ph.totalTargetMetrics > 0)) // Include any program with targets
+      .filter(ph => (ph.totalTargetMetrics > 0))
       .map(ph => {
-        const pct = ph.healthScore; // HealthScore is already the weighted achievement of primary metrics
+        const healthPct = ph.healthScore
+
+        // Raw % target: actual vs full monthly target (no proration)
+        const primaryDefs = (ph.program.program_metric_definitions || []).filter(
+          m => m.is_primary && m.is_target_metric
+        )
+        let rawSum = 0, rawCount = 0
+        primaryDefs.forEach(m => {
+          const actual = ph.calculatedMetrics?.[m.metric_key] ?? 0
+          const target = ph.absoluteTargets?.[m.metric_key] ?? 0
+          if (target > 0) { rawSum += (actual / target) * 100; rawCount++ }
+        })
+        // Qualitative programs: rawTargetPct == healthPct (milestone-based)
+        const rawTargetPct = rawCount > 0 ? rawSum / rawCount : (ph.isQualitativeOnly ? healthPct : 0)
+
         return {
           name: ph.program.name,
-          achievementPct: pct,
-          color: pct >= 70 ? '#639922' : pct >= 50 ? '#EAB308' : '#E24B4A',
+          achievementPct: healthPct,
+          rawTargetPct,
+          color: healthPct >= 70 ? '#639922' : healthPct >= 50 ? '#EAB308' : '#E24B4A',
+          rawColor: rawTargetPct >= 70 ? '#639922' : rawTargetPct >= 50 ? '#EAB308' : '#E24B4A',
           isMou: isMouProgram(ph.program.program_metric_definitions || [])
         }
       })
-      .sort((a, b) => a.achievementPct - b.achievementPct)
-      .slice(0, 10) // Keep top 10 most critical/relevant
-  }, [programHealths])
+      .sort((a, b) => {
+        const aVal = capaianMode === 'health' ? a.achievementPct : a.rawTargetPct
+        const bVal = capaianMode === 'health' ? b.achievementPct : b.rawTargetPct
+        return aVal - bVal
+      })
+      .slice(0, 10)
+  }, [programHealths, capaianMode])
 
   const currentHealth = (activeTab === 'target' && selectedOmzetProgramId !== 'all') 
     ? (omzetSummary.health)
@@ -955,35 +976,96 @@ export function OverviewClient({
              </div>
              
              <div className="lg:col-span-4 bg-white p-6 rounded-xl border border-[#E5E7EB]">
-                <h3 className="font-semibold text-[#111827] mb-6 text-sm flex items-center gap-3">
-                  <div className="p-2 bg-rose-50 rounded-lg">
-                    <Target className="h-4 w-4 text-rose-600" />
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-semibold text-[#111827] text-sm flex items-center gap-3">
+                    <div className="p-2 bg-rose-50 rounded-lg">
+                      <Target className="h-4 w-4 text-rose-600" />
+                    </div>
+                    Capaian Target per Program
+                  </h3>
+                  {/* Toggle: Health vs % Target */}
+                  <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                    <button
+                      onClick={() => setCapaianMode('health')}
+                      title="Health Score: capaian aktual vs target yang seharusnya sudah tercapai hingga hari ini (terprorata)"
+                      className={cn(
+                        'text-[10px] font-bold px-2.5 py-1.5 rounded-md transition-all',
+                        capaianMode === 'health'
+                          ? 'bg-white text-[#534AB7] shadow-sm border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-700'
+                      )}
+                    >
+                      Health
+                    </button>
+                    <button
+                      onClick={() => setCapaianMode('target')}
+                      title="% Target Bulanan: capaian aktual vs target penuh bulan ini (tanpa prorata)"
+                      className={cn(
+                        'text-[10px] font-bold px-2.5 py-1.5 rounded-md transition-all',
+                        capaianMode === 'target'
+                          ? 'bg-white text-[#534AB7] shadow-sm border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-700'
+                      )}
+                    >
+                      % Target
+                    </button>
                   </div>
-                  Capaian Target per Program
-                </h3>
+                </div>
+                {/* Mode description */}
+                <p className="text-[10px] text-slate-400 -mt-4 mb-4 ml-11">
+                  {capaianMode === 'health'
+                    ? 'vs target terprorata hari ini'
+                    : 'vs target penuh bulan ini'}
+                </p>
                 <div className="h-72">
                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={capaianProgramData} layout="vertical" margin={{ left: -20, right: 30 }}>
-                        <XAxis type="number" hide domain={[0, (dataMax: number) => dataMax + 10]} />
-                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }} width={110} tickFormatter={(v: string) => v.length > 15 ? v.slice(0, 13) + '...' : v} />
-                        <Tooltip 
-                            cursor={{ fill: '#f8fafc' }} 
-                            contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none' }} 
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            formatter={(val: any, name: any, props: any) => {
-                              const isMou = props?.payload?.isMou;
-                              return [`${Number(val).toFixed(1)}%`, isMou ? 'Capaian MoU' : 'Capaian Target'];
-                            }}
+                      <BarChart
+                        data={capaianProgramData}
+                        layout="vertical"
+                        margin={{ left: -20, right: 30 }}
+                      >
+                        <XAxis type="number" hide domain={[0, (dataMax: number) => Math.max(dataMax + 10, 110)]} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }}
+                          width={110}
+                          tickFormatter={(v: string) => v.length > 15 ? v.slice(0, 13) + '...' : v}
                         />
-                        <Bar 
-                          dataKey="achievementPct" 
-                          radius={[0, 4, 4, 0]} 
-                          maxBarSize={20} 
+                        <Tooltip
+                          cursor={{ fill: '#f8fafc' }}
+                          contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none', fontSize: 12 }}
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          label={{ position: 'right', formatter: (val: any) => val !== undefined ? Math.round(Number(val)) + '%' : '' }}
+                          formatter={(val: any, _name: any, props: any) => {
+                            const payload = props?.payload
+                            const pct = Number(val).toFixed(1)
+                            const isMou = payload?.isMou
+                            if (capaianMode === 'health') {
+                              const label = isMou ? 'Health MoU (terprorata)' : 'Health Score (terprorata)'
+                              return [`${pct}%`, label]
+                            }
+                            const label = isMou ? '% Target MoU (bulanan)' : '% Target Bulanan'
+                            return [`${pct}%`, label]
+                          }}
+                          labelFormatter={(label: any) => {
+                            const labelStr = String(label || '')
+                            return labelStr.length > 30 ? labelStr.slice(0, 28) + '...' : labelStr
+                          }}
+                        />
+                        <Bar
+                          dataKey={capaianMode === 'health' ? 'achievementPct' : 'rawTargetPct'}
+                          radius={[0, 4, 4, 0]}
+                          maxBarSize={20}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          label={{ position: 'right', fontSize: 10, fill: '#64748b', fontWeight: 600, formatter: (val: any) => val !== undefined ? Math.round(Number(val)) + '%' : '' }}
                         >
                           {capaianProgramData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={capaianMode === 'health' ? entry.color : entry.rawColor}
+                            />
                           ))}
                         </Bar>
                       </BarChart>
