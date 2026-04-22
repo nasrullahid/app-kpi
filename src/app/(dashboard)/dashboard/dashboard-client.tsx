@@ -709,21 +709,27 @@ export function OverviewClient({
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
 
-    // 1. Omzet Hari Ini 
+    // 1. Omzet Hari Ini & Kemarin 
     const trend = summary.targetTrend || [];
     const todayIndex = trend.findIndex(t => t.date === todayStr);
     
     let today_revenue = 0;
-    if (todayIndex >= 0) {
-      const todayCum = trend[todayIndex].actualRevenue;
-      const yesterdayCum = todayIndex > 0 ? trend[todayIndex - 1].actualRevenue : 0;
-      today_revenue = Math.max(0, todayCum - yesterdayCum);
-    } else {
-       const hasPastTrend = trend.length > 0 && new Date(trend[trend.length-1].date) < today;
-       if (hasPastTrend) {
-          today_revenue = 0;
-       }
+    let yesterday_revenue = 0;
+
+    if (trend.length > 0) {
+      if (todayIndex >= 0) {
+        today_revenue = trend[todayIndex].actualRevenue;
+        yesterday_revenue = todayIndex > 0 ? trend[todayIndex - 1].actualRevenue : 0;
+      } else {
+        // Jika hari ini belum ada di trend (pagi hari), ambil titik terakhir sebagai kemarin
+        yesterday_revenue = trend[trend.length - 1].actualRevenue;
+        today_revenue = 0;
+      }
     }
+
+    const growth_vs_kemarin = yesterday_revenue > 0 
+      ? ((today_revenue - yesterday_revenue) / yesterday_revenue) * 100 
+      : (today_revenue > 0 ? 100 : 0);
 
     // 2. Target Harian & Pace
     const monthly_revenue = summary.aggregates.revenue.actual || 0;
@@ -765,7 +771,9 @@ export function OverviewClient({
       proyeksi_akhir_bulan,
       monthly_target,
       pace_harian,
-      tertinggal_count
+      tertinggal_count,
+      yesterday_revenue,
+      growth_vs_kemarin
     }
   }, [activePeriod, summary.targetTrend, summary.aggregates.revenue, programHealths, dailyInputs, metricValues]);
 
@@ -864,14 +872,15 @@ export function OverviewClient({
               icon={CircleDollarSign} 
               label="Omzet hari ini" 
               value={formatRupiah(overviewMetrics?.today_revenue || 0)} 
-              sub={`dari target ${(overviewMetrics?.daily_target_global || 0) >= 1000000 ? ((overviewMetrics?.daily_target_global || 0)/1000000).toFixed(1) + 'jt' : formatRupiah(overviewMetrics?.daily_target_global || 0)}/hari`} 
+              sub={`dari target ${formatRupiah(overviewMetrics?.daily_target_global || 0)} (${((overviewMetrics?.today_revenue || 0) / (overviewMetrics?.daily_target_global || 1) * 100).toFixed(0)}%)`} 
               accentColor={(overviewMetrics?.today_revenue || 0) >= (overviewMetrics?.daily_target_global || 0) ? "#639922" : "#EAB308"}
               tooltip="Total pendapatan seluruh program yang tercatat khusus pada hari ini."
               comparison={{
                 value: overviewMetrics?.today_revenue || 0,
+                percentage: overviewMetrics?.growth_vs_kemarin || 0,
                 type: 'flow',
-                label: ((overviewMetrics?.today_revenue || 0) >= (overviewMetrics?.daily_target_global || 0)) ? 'Aman' : 'Perlu Push',
-                status: ((overviewMetrics?.today_revenue || 0) >= (overviewMetrics?.daily_target_global || 0)) ? 'ahead' : 'behind'
+                label: 'vs kemarin',
+                status: (overviewMetrics?.growth_vs_kemarin || 0) >= 0 ? 'improving' : 'declining'
               }} 
             />
             <KpiCard 
