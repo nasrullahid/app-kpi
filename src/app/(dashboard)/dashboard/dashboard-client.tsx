@@ -1049,6 +1049,7 @@ export function OverviewClient({
                             const label = isMou ? '% Target MoU (bulanan)' : '% Target Bulanan'
                             return [`${pct}%`, label]
                           }}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           labelFormatter={(label: any) => {
                             const labelStr = String(label || '')
                             return labelStr.length > 30 ? labelStr.slice(0, 28) + '...' : labelStr
