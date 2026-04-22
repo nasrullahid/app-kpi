@@ -240,10 +240,9 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
 
     // ── Add Lead to MoU Rate (Conversion) ──
     if (isMoU) {
-      const uMetrics = Array.from(unifiedMetricsMap.values())
-      const leads = uMetrics.find(m => m.key === 'leads' || m.key === 'agreement_leads' || m.key === 'prospek')?.achieved || 0
-      const signed = uMetrics.find(m => m.key === 'user_acquisition' || m.key === 'mou_signed' || m.key === 'user_count')?.achieved || 0
-      const rate = leads > 0 ? (signed / leads) : 0
+      const totalLeadsCumulative = ph.calculatedMetrics?.['mou_total_leads_raw'] || 0
+      const totalTTDCumulative = ph.calculatedMetrics?.['mou_total_ttd_raw'] || 0
+      const rate = totalLeadsCumulative > 0 ? (totalTTDCumulative / totalLeadsCumulative) : 0
       
       unifiedMetricsMap.set('conversion_rate', {
         key: 'conversion_rate',

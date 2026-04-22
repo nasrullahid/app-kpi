@@ -121,25 +121,37 @@ export function SlideProgramDetail({
 
   // Daily processing for chart
   const dailyPoints = useMemo(() => {
-    // ── MoU: use custom metric values (mou_signed / agreement_leads) ──
+    // ── MoU: merge custom metric values + legacy inputs ──
     if (isMoU) {
       const signedDef = metricDefinitions.find(d =>
-        d.metric_key === 'mou_signed' || d.metric_key === 'user_count' || d.metric_key === 'user_acquisition'
+        d.metric_key === 'mou_signed' || d.metric_key === 'user_count' || d.metric_key === 'user_acquisition' || d.metric_key === 'tanda_tangan_mou'
       )
       const leadsDef = metricDefinitions.find(d =>
-        d.metric_key === 'agreement_leads' || d.metric_key === 'leads'
+        d.metric_key === 'agreement_leads' || d.metric_key === 'leads' || d.metric_key === 'prospek' || d.metric_key === 'prospek_kerja_sama'
       )
 
       // Group by date
       const dateMap = new Map<string, { signed: number; leads: number }>()
+      
+      // 1. Add legacy inputs
+      inputs.forEach(input => {
+        const d = input.date
+        const existing = dateMap.get(d) || { signed: 0, leads: 0 }
+        existing.signed += Number(input.achievement_user || 0)
+        existing.leads += Number(input.achievement_rp || 0)
+        dateMap.set(d, existing)
+      })
+
+      // 2. Add custom metric values
       metricValues.forEach(mv => {
         const key = defIdToKeyMap.get(mv.metric_definition_id)
         if (!key) return
         const val = Number(mv.value || 0)
-        const existing = dateMap.get(mv.date) || { signed: 0, leads: 0 }
+        const d = mv.date
+        const existing = dateMap.get(d) || { signed: 0, leads: 0 }
         if (signedDef && mv.metric_definition_id === signedDef.id) existing.signed += val
         if (leadsDef && mv.metric_definition_id === leadsDef.id) existing.leads += val
-        dateMap.set(mv.date, existing)
+        dateMap.set(d, existing)
       })
 
       const sorted = Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b))
@@ -151,8 +163,8 @@ export function SlideProgramDetail({
         return {
           date,
           displayDate: new Date(date).getDate().toString(),
-          rp: vals.leads,        // reuse 'rp' slot for leads (bar)
-          user: vals.signed,     // reuse 'user' slot for signed (line)
+          rp: vals.leads,        // bar
+          user: vals.signed,     // line
           cumRp: cumLeads,
           cumUser: cumSigned,
         }

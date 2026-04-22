@@ -174,6 +174,10 @@ export function calculateProgramHealth(
           const legacyInputs = dailyInputsByProgram.get(program.id) || []
           const totalDrop = legacyInputs.reduce((s, li) => s + (Number(li.prospek_drop) || 0), 0)
           
+          // Store raw cumulative for rate calculations elsewhere (e.g. TV Dashboard)
+          evaluatedMetrics['mou_total_leads_raw'] = totalProspekBaru
+          evaluatedMetrics['mou_total_ttd_raw'] = totalTTD
+          
           evaluatedMetrics[m.metric_key] = Math.max(0, totalProspekBaru - totalTTD - totalDrop)
         }
 
