@@ -112,27 +112,45 @@ function computeKPIs(
   metricValues: MetricValue[],
   activePeriod: ActivePeriod
 ): ComputedKPIs {
-  // Calculate total revenue actual from all programs
+  const revKeys = ['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic']
+
+  // Calculate total revenue actual from all programs using synonyms
   const totalRevenue = programHealths.reduce((sum, ph) => {
     const m = ph.calculatedMetrics || {}
-    return sum + (m.revenue ?? m.omzet ?? 0)
+    let progRev = 0
+    revKeys.forEach(k => { progRev += (m[k] || 0) })
+    return sum + progRev
   }, 0)
 
   const totalRevenueTarget = programHealths.reduce((sum, ph) => {
     const t = ph.absoluteTargets || {}
-    return sum + (t.revenue ?? t.omzet ?? 0)
+    let progTarget = 0
+    revKeys.forEach(k => { progTarget += (t[k] || 0) })
+    return sum + progTarget
   }, 0)
 
   const workingDays = activePeriod.working_days || 30
   const totalCalendarDays = new Date(activePeriod.year, activePeriod.month, 0).getDate()
   const today = new Date()
-  const calendarElapsed =
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+
+  // Check if there is ANY data for today to decide the pace divisor
+  const hasTodayData =
+    metricValues.some(mv => mv.date === todayStr && mv.value !== null) ||
+    dailyInputs.some(di => di.date === todayStr)
+
+  const calendarDaysRaw =
     today.getFullYear() === activePeriod.year && today.getMonth() + 1 === activePeriod.month
       ? today.getDate()
       : today.getFullYear() > activePeriod.year ||
         (today.getFullYear() === activePeriod.year && today.getMonth() + 1 > activePeriod.month)
       ? totalCalendarDays
       : 0
+
+  const calendarElapsed = (today.getFullYear() === activePeriod.year && today.getMonth() + 1 === activePeriod.month)
+    ? (hasTodayData ? calendarDaysRaw : Math.max(0, calendarDaysRaw - 1))
+    : calendarDaysRaw
 
   const workingDaysElapsed = Math.min(workingDays, Math.round((calendarElapsed / totalCalendarDays) * workingDays))
   const paceHarian = workingDaysElapsed > 0 ? totalRevenue / workingDaysElapsed : totalRevenue
@@ -183,7 +201,7 @@ function buildSummarySheet(
     ['Target Harian Global', formatRupiahExport(kpis.dailyTargetGlobal)],
     ['Proyeksi Omzet Akhir Bulan', formatRupiahExport(kpis.proyeksiAkhirBulan)],
     ['Vs Target Bulanan', kpis.totalRevenueTarget > 0
-      ? `${((kpis.proyeksiAkhirBulan / kpis.totalRevenueTarget) * 100).toFixed(1)}%`
+      ? `${((kpis.totalRevenue / kpis.totalRevenueTarget) * 100).toFixed(1)}%`
       : '-'],
     [],
   ]
@@ -212,18 +230,31 @@ function buildSummarySheet(
     const targets = ph.absoluteTargets || {}
     const isMoU = p.target_type === 'mou' || isMouProgramHelper(p.program_metric_definitions)
 
-    const revActual = metrics.revenue ?? metrics.omzet ?? 0
-    const revTarget = targets.revenue ?? targets.omzet ?? 0
+    const revKeys = ['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic']
+    const userKeys = ['user_count', 'closing', 'leads_converted', 'pembelian']
+
+    let revActual = 0
+    revKeys.forEach(k => { revActual += (metrics[k] || 0) })
+
+    let revTarget = 0
+    revKeys.forEach(k => { revTarget += (targets[k] || 0) })
+
     const revPct = revTarget > 0 ? (revActual / revTarget) : 0
 
     // For MoU, prioritize mou_signed or agreement metrics
-    const userActual = isMoU
-      ? (metrics.mou_signed ?? metrics.user_acquisition ?? metrics.user_count ?? 0)
-      : (metrics.user_count ?? metrics.closing ?? 0)
+    let userActual = 0
+    if (isMoU) {
+      userActual = metrics.mou_signed ?? metrics.user_acquisition ?? metrics.user_count ?? 0
+    } else {
+      userKeys.forEach(k => { userActual += (metrics[k] || 0) })
+    }
 
-    const userTarget = isMoU
-      ? (targets.mou_signed ?? targets.user_acquisition ?? targets.user_count ?? 0)
-      : (targets.user_count ?? targets.closing ?? 0)
+    let userTarget = 0
+    if (isMoU) {
+      userTarget = targets.mou_signed ?? targets.user_acquisition ?? targets.user_count ?? 0
+    } else {
+      userKeys.forEach(k => { userTarget += (targets[k] || 0) })
+    }
 
     const userPct = userTarget > 0 ? (userActual / userTarget) : 0
 
