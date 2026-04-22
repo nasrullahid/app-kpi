@@ -1,9 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { ProgramPerformance, DailyInput, Milestone, Period, MetricDefinition, MetricValue } from '../actions'
 import { formatRupiah, cn } from '@/lib/utils'
 import { formatMetricValue } from '@/lib/formula-evaluator'
+import { getBannerInfo } from '@/lib/dashboard-calculator'
 import { 
   XAxis, 
   YAxis, 
@@ -260,11 +261,31 @@ export function SlideProgramDetail({
 
         {/* CENTER: Metrics + Chart */}
         <div className="flex flex-col gap-4 overflow-hidden min-h-0">
+          {/* Motivational Banner */}
+          {(() => {
+            const banner = getBannerInfo(program.health.healthScore)
+            return (
+              <div className={cn(
+                "px-6 py-3 rounded-xl border flex items-center gap-4 shrink-0 transition-all duration-1000 animate-in fade-in slide-in-from-top-4",
+                banner.bg,
+                banner.border
+              )}>
+                <div className="h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: banner.accent }} />
+                <p className={cn("text-lg font-black uppercase tracking-tight italic", banner.textCol)}>
+                  {banner.text}
+                </p>
+              </div>
+            )
+          })()}
+
           {(!isQualitative && !isMoU) || (isMoU && hasCustomMetrics) ? (
             <>
               {/* Metric Row */}
-              <div className={`grid gap-4 shrink-0 ${hasCustomMetrics ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
-                {program.unifiedPrimaryMetrics.length > 0 ? (
+              <div className={cn(
+                "grid gap-4 shrink-0",
+                program.unifiedPrimaryMetrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4"
+              )}>
+                {hasCustomMetrics ? (
                   program.unifiedPrimaryMetrics.map(metric => {
                     const achieved = metric.achieved
                     const target = metric.target
@@ -272,9 +293,31 @@ export function SlideProgramDetail({
                     const originalDef = metricDefinitions.find(d => d.metric_key === metric.key)
                     const isLower = originalDef?.target_direction === 'lower_is_better'
 
+                    // Dynamic colors based on metric type
+                    const k = metric.key.toLowerCase()
+                    const isRev = k.includes('revenue') || k.includes('omzet') || k.includes('pemasukan')
+                    const isLeads = k.includes('lead') || k.includes('prospek')
+                    const isUser = k.includes('user') || k.includes('signed') || k.includes('acquisition') || k.includes('closing')
+                    const isConv = k.includes('rate') || k.includes('conversion')
+
+                    const accentClass = isRev ? "text-cyan-400" : 
+                                       isLeads ? "text-amber-400" : 
+                                       isUser ? "text-purple-400" : 
+                                       isConv ? "text-emerald-400" : "text-indigo-400"
+
+                    const borderClass = isRev ? "border-cyan-500/20" : 
+                                        isLeads ? "border-amber-500/20" : 
+                                        isUser ? "border-purple-500/20" : 
+                                        isConv ? "border-emerald-500/20" : "border-indigo-500/20"
+
+                    const progressColor = isRev ? "#22d3ee" : 
+                                          isLeads ? "#fbbf24" : 
+                                          isUser ? "#a78bfa" : 
+                                          isConv ? "#10b981" : "#818cf8"
+
                     return (
-                      <Card key={metric.key} className="p-5 flex flex-col justify-between bg-slate-900 border-indigo-500/20">
-                        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">{metric.label}</div>
+                      <Card key={metric.key} className={cn("p-5 flex flex-col justify-between bg-slate-900", borderClass)}>
+                        <div className={cn("text-[10px] font-black uppercase tracking-widest mb-2", accentClass)}>{metric.label}</div>
                         <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
                           <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -287,11 +330,11 @@ export function SlideProgramDetail({
                             </div>
                           )}
                         </div>
-                        {target > 0 && <ProgressBar pct={isLower ? Math.max(0, 100 - pct + 100) : pct} color="linear-gradient(90deg, #00aacc, #00d4ff)" />}
+                        {target > 0 && <ProgressBar pct={isLower ? Math.max(0, 100 - pct + 100) : pct} color={progressColor} />}
                         {target > 0 && (
                           <div className="text-[9px] text-slate-500 mt-1 flex justify-between">
                             <span>{isLower ? '↓ Lower better' : 'Progress'}</span>
-                            <span className="text-cyan-400 font-bold">{pct.toFixed(1)}%</span>
+                            <span className={cn("font-bold", accentClass)}>{pct.toFixed(1)}%</span>
                           </div>
                         )}
                       </Card>
@@ -300,18 +343,30 @@ export function SlideProgramDetail({
                 ) : (
                   <>
                     <Card className="p-5 flex flex-col justify-between border-indigo-500/20 bg-slate-900/50">
-                      <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">Target Capaian (RP)</div>
+                      <div className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-2">
+                        {isMoU ? 'Total Prospek' : 'Target Capaian (RP)'}
+                      </div>
                       <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
-                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{formatRupiah(achievementRp)}</div>
-                         {targetRp > 0 && <div className="text-[10px] text-slate-500 uppercase mb-2">Budget: {formatRupiah(targetRp)}</div>}
+                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                           {isMoU ? achievementRp : formatRupiah(achievementRp)}
+                         </div>
+                         {targetRp > 0 && (
+                           <div className="text-[10px] text-slate-500 uppercase mb-2">
+                             {isMoU ? 'Goal' : 'Budget'}: {isMoU ? targetRp : formatRupiah(targetRp)}
+                           </div>
+                         )}
                       </div>
                       {targetRp > 0 && <ProgressBar pct={(achievementRp / targetRp) * 100} />}
                     </Card>
                     <Card className="p-5 flex flex-col justify-between border-purple-500/20 bg-slate-900/50">
-                      <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">Target User</div>
+                      <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">
+                        {isMoU ? 'Tanda Tangan MoU' : 'Target User'}
+                      </div>
                       <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
-                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{achievementUser} <small className="text-xs">{isMoU ? 'Tanda Tangan' : 'User'}</small></div>
-                         {targetUser > 0 && <div className="text-[10px] text-slate-500 uppercase mb-2">Goal: {targetUser} User</div>}
+                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                           {achievementUser} <small className="text-xs">{isMoU ? 'MOU' : 'User'}</small>
+                         </div>
+                         {targetUser > 0 && <div className="text-[10px] text-slate-500 uppercase mb-2">Goal: {targetUser} {isMoU ? 'MOU' : 'User'}</div>}
                       </div>
                       {targetUser > 0 && <ProgressBar pct={(achievementUser / targetUser) * 100} color="#a78bfa" />}
                     </Card>

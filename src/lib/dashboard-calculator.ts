@@ -959,3 +959,29 @@ export function calculateGrowth(current: number, previous: number): number | nul
   if (previous === null || current === null) return null
   return ((current - previous) / previous) * 100
 }
+
+// ── Status helpers ───────────────────────────────────────────────────────────
+export function getStatusLabelAndColor(score: number): { label: string; dot: string; badge: string, accent: string } {
+  if (score >= 100) return { label: 'Excellent', dot: 'bg-blue-500',   badge: 'text-blue-700 bg-blue-50 border-blue-200',   accent: '#FCD34D' } // Gold/Excellent
+  if (score >= 80)  return { label: 'Baik',      dot: 'bg-emerald-500', badge: 'text-emerald-700 bg-emerald-50 border-emerald-200', accent: '#639922' } // Green
+  if (score >= 60)  return { label: 'Cukup',     dot: 'bg-amber-400',   badge: 'text-amber-700 bg-amber-50 border-amber-200',   accent: '#EAB308' } // Amber
+  if (score >= 40)  return { label: 'Perlu perhatian', dot: 'bg-orange-500', badge: 'text-orange-700 bg-orange-50 border-orange-200', accent: '#378ADD' } // Blue/Info
+  return { label: 'Kritis', dot: 'bg-red-500', badge: 'text-red-700 bg-red-50 border-red-200', accent: '#E24B4A' } // Red
+}
+
+export function getProgressColor(score: number) {
+  if (score >= 100) return 'bg-blue-500'
+  if (score >= 80)  return 'bg-emerald-500'
+  if (score >= 60)  return 'bg-amber-400'
+  if (score >= 40)  return 'bg-orange-500'
+  return 'bg-red-500'
+}
+
+export function getBannerInfo(score: number) {
+  if (score < 40)  return { text: 'Target jauh tertinggal — fokus dan kejar sekarang! 💪', bg: 'bg-[#FCEBEB]', border: 'border-[#F7C1C1]', textCol: 'text-[#791F1F]', accent: '#E24B4A' }
+  if (score < 60)  return { text: 'Masih ada waktu — tingkatkan intensitas! 🔥', bg: 'bg-orange-50', border: 'border-orange-200', textCol: 'text-orange-800', accent: '#F97316' }
+  if (score < 80)  return { text: 'Progres bagus — jangan kendur! 🎯', bg: 'bg-blue-50', border: 'border-blue-200', textCol: 'text-blue-800', accent: '#3B82F6' }
+  if (score < 100) return { text: 'Hampir sampai — satu langkah lagi! 🚀', bg: 'bg-indigo-50', border: 'border-[#EEEDFE]', textCol: 'text-[#534AB7]', accent: '#6366F1' }
+  if (score < 105) return { text: 'ALHAMDULILLAH TARGET TERCAPAI 🏆', bg: 'bg-emerald-50', border: 'border-emerald-200', textCol: 'text-emerald-800', accent: '#10B981' }
+  return { text: 'MASYAALLAH WOW TARGET TERLAMPAUI! 🚀', bg: 'bg-blue-50', border: 'border-blue-200', textCol: 'text-blue-800', accent: '#3B82F6' }
+}

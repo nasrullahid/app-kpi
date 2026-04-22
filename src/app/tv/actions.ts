@@ -99,23 +99,26 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
     // Use unified metrics from calculated results
     const definitions = prog.program_metric_definitions || []
     
-    // Identify primary candidates: explicitly marked OR belonging to core groups
-    const coreGroupKeys = ['revenue', 'user_acquisition']
-    const coreMetricKeys = ['revenue', 'user_count', 'omzet', 'closing']
+    const isMoU = (prog.target_type as string) === 'mou'
+    const coreGroupKeys = ['revenue', 'user_acquisition', 'leads']
+    const coreMetricKeys = ['revenue', 'user_count', 'omzet', 'closing', 'leads', 'prospek', 'agreement_leads', 'mou_signed']
     
     const primaryDefs = definitions.filter(m => 
       m.is_primary || 
-      coreGroupKeys.includes(m.metric_group || '') || 
-      coreMetricKeys.includes(m.metric_key?.toLowerCase() || '')
-    ).filter(m => m.is_target_metric)
+      m.is_target_metric || 
+      (isMoU && coreMetricKeys.includes(m.metric_key?.toLowerCase() || ''))
+    )
     // Sort to keep revenue first, then user_count, then others
     .sort((a, b) => {
       const getPriority = (m: MetricDefinition) => {
         const k = m.metric_key?.toLowerCase()
         const g = m.metric_group
-        if (g === 'revenue' || k === 'revenue' || k === 'omzet') return 1
-        if (g === 'user_acquisition' || k === 'user_count' || k === 'closing') return 2
-        return 3
+        // For general view: Revenue 1, Acq 2, Leads 3
+        // If MoU, we might want Leads 1, Acq 2
+        if (g === 'leads' || k === 'leads' || k === 'prospek' || k === 'agreement_leads') return 1
+        if (g === 'revenue' || k === 'revenue' || k === 'omzet') return 2
+        if (g === 'user_acquisition' || k === 'user_count' || k === 'closing' || k === 'mou_signed') return 3
+        return 4
       }
       return getPriority(a) - getPriority(b)
     })
@@ -127,10 +130,11 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       const k = m.metric_key?.toLowerCase()
       const g = m.metric_group || 
                 (['revenue', 'omzet', 'pemasukan', 'revenue_from_paid_traffic'].includes(k) ? 'revenue' : 
-                 (['user_count', 'closing', 'leads_converted', 'pembelian'].includes(k) || k.includes('closing')) ? 'user_acquisition' : null)
+                 (['user_count', 'closing', 'leads_converted', 'pembelian', 'mou_signed'].includes(k) || k.includes('closing')) ? 'user_acquisition' :
+                 null)
       
       if (!g) {
-        // Standalone primary metric
+        // Standalone primary metric or ungrouped core metric (e.g. leads, prospek)
         const key = m.metric_key
         unifiedMetricsMap.set(key, {
           key,
@@ -153,7 +157,9 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       } else {
         unifiedMetricsMap.set(g, {
           key: g, // Use group as key for easier sum lookup in components
-          label: g === 'revenue' ? 'Total Omzet' : g === 'user_acquisition' ? 'Total Closing' : m.label,
+          label: g === 'revenue' ? 'Total Omzet' : 
+                 g === 'user_acquisition' ? 'Total Closing' : 
+                 g === 'leads' ? 'Total Prospek' : m.label,
           achieved,
           target: m.data_type === 'currency' ? absoluteTarget : Math.round(absoluteTarget),
           unit: m.unit_label || '',
@@ -162,11 +168,10 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       }
     })
 
-    // --- Enhanced legacy target merging ---
-    // Merge Revenue
+    // Merge Revenue (only if not MoU, as MoU uses this field for Lead target)
     const existingRev = unifiedMetricsMap.get('revenue')
     const legacyRevTarget = prog.monthly_target_rp || 0
-    if (legacyRevTarget > 0 && !ph.isQualitativeOnly) {
+    if (legacyRevTarget > 0 && !ph.isQualitativeOnly && !isMoU) {
       if (!existingRev) {
         unifiedMetricsMap.set('revenue', {
           key: 'revenue',
@@ -180,6 +185,23 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
         existingRev.target = legacyRevTarget
       }
     }
+
+    // Merge Leads for MoU (MoU uses monthly_target_rp for leads target)
+    const existingLeads = unifiedMetricsMap.get('leads') || Array.from(unifiedMetricsMap.values()).find(m => m.key === 'agreement_leads' || m.key === 'leads' || m.key === 'prospek')
+    if (isMoU && legacyRevTarget > 0) {
+      if (existingLeads) {
+        if (existingLeads.target === 0) existingLeads.target = legacyRevTarget
+      } else {
+        unifiedMetricsMap.set('leads', {
+          key: 'leads',
+          label: 'Prospek',
+          achieved: ph.calculatedMetrics?.['agreement_leads'] || ph.calculatedMetrics?.['leads'] || 0,
+          target: legacyRevTarget,
+          unit: 'prospek',
+          dataType: 'integer'
+        })
+      }
+    }
     
     // Merge User Acquisition
     const existingAcq = unifiedMetricsMap.get('user_acquisition')
@@ -188,15 +210,32 @@ export async function getTVDashboardData(): Promise<TVDashboardData> {
       if (!existingAcq) {
         unifiedMetricsMap.set('user_acquisition', {
           key: 'user_acquisition',
-          label: 'Closing',
-          achieved: ph.calculatedMetrics?.['user_count'] || 0,
+          label: isMoU ? 'Tanda Tangan MoU' : 'Closing',
+          achieved: ph.calculatedMetrics?.['mou_signed'] || ph.calculatedMetrics?.['user_count'] || 0,
           target: legacyUserTarget,
-          unit: 'user',
+          unit: isMoU ? 'mou' : 'user',
           dataType: 'integer'
         })
       } else if (existingAcq.target === 0) {
         existingAcq.target = legacyUserTarget
       }
+    }
+
+    // ── Add Lead to MoU Rate (Conversion) ──
+    if (isMoU) {
+      const uMetrics = Array.from(unifiedMetricsMap.values())
+      const leads = uMetrics.find(m => m.key === 'leads' || m.key === 'agreement_leads' || m.key === 'prospek')?.achieved || 0
+      const signed = uMetrics.find(m => m.key === 'user_acquisition' || m.key === 'mou_signed' || m.key === 'user_count')?.achieved || 0
+      const rate = leads > 0 ? (signed / leads) : 0
+      
+      unifiedMetricsMap.set('conversion_rate', {
+        key: 'conversion_rate',
+        label: 'Lead to MoU Rate',
+        achieved: rate,
+        target: 0,
+        unit: '%',
+        dataType: 'percentage'
+      })
     }
 
     const unifiedPrimaryMetrics = Array.from(unifiedMetricsMap.values())
