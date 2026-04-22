@@ -46,11 +46,13 @@ export function PivotTableClient({
 
   // Metric Grouping Logic
   const metricGroups = useMemo(() => {
+    const isMoU = (activeProgram?.target_type === 'mou')
+    
     const groups: Record<string, { label: string; metrics: MetricDefinition[] }> = {
       'revenue': { label: '💰 Pendapatan', metrics: [] },
-      'user_acquisition': { label: '👥 User/Closing', metrics: [] },
+      'user_acquisition': { label: isMoU ? '🤝 Tanda Tangan / MoU' : '👥 User/Closing', metrics: [] },
       'ad_spend': { label: '📢 Iklan/Spent', metrics: [] },
-      'leads': { label: '🎯 Funnel/Leads', metrics: [] },
+      'leads': { label: isMoU ? '🎯 Prospek Kerja Sama' : '🎯 Funnel/Leads', metrics: [] },
       'conversion': { label: '🔄 Konversi', metrics: [] },
       'efficiency': { label: '📈 Efisiensi', metrics: [] },
       'others': { label: '⚙️ Metrik Lainnya', metrics: [] }
@@ -62,7 +64,7 @@ export function PivotTableClient({
     })
 
     return Object.entries(groups).filter(([, data]) => data.metrics.length > 0)
-  }, [metrics])
+  }, [metrics, activeProgram])
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     // Expand revenue and user_acquisition by default
@@ -481,7 +483,7 @@ export function PivotTableClient({
                     )}>
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
-                           <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mb-0.5", isToday ? "text-indigo-600" : "text-slate-400 text-slate-500")}>
+                           <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mb-0.5", isToday ? "text-indigo-600" : "text-slate-500")}>
                              {isToday ? 'Hari Ini' : dateStr > todayStr ? 'Mendatang' : 'Riwayat'}
                            </span>
                            <h4 className="font-bold text-slate-800 text-lg">

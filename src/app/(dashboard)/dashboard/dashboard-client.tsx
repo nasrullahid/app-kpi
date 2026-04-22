@@ -24,7 +24,7 @@ import {
 import {
   HeartPulse, Layers, Target, CheckSquare,
   Search, ArrowUpRight, ArrowDownRight, TrendingUp, Handshake, FileDown,
-  Users, Info, CircleDollarSign, AlertTriangle
+  Info, CircleDollarSign, AlertTriangle
 } from 'lucide-react'
 
 import { DashboardSummary } from '@/lib/dashboard-service'
@@ -633,18 +633,18 @@ export function OverviewClient({
 
   const capaianProgramData = useMemo(() => {
     return [...programHealths]
-      .filter(ph => (ph.absoluteTargets?.revenue || 0) > 0)
+      .filter(ph => (ph.totalTargetMetrics > 0)) // Include any program with targets
       .map(ph => {
-        const actual = ph.calculatedMetrics?.revenue || 0;
-        const target = ph.absoluteTargets?.revenue || 1;
-        const pct = (actual / target) * 100;
+        const pct = ph.healthScore; // HealthScore is already the weighted achievement of primary metrics
         return {
           name: ph.program.name,
           achievementPct: pct,
-          color: pct >= 70 ? '#639922' : pct >= 50 ? '#EAB308' : '#E24B4A'
+          color: pct >= 70 ? '#639922' : pct >= 50 ? '#EAB308' : '#E24B4A',
+          isMou: isMouProgram(ph.program.program_metric_definitions || [])
         }
       })
       .sort((a, b) => a.achievementPct - b.achievementPct)
+      .slice(0, 10) // Keep top 10 most critical/relevant
   }, [programHealths])
 
   const currentHealth = (activeTab === 'target' && selectedOmzetProgramId !== 'all') 
@@ -970,7 +970,10 @@ export function OverviewClient({
                             cursor={{ fill: '#f8fafc' }} 
                             contentStyle={{ borderRadius: 12, border: '1px solid #E5E7EB', boxShadow: 'none' }} 
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            formatter={(val: any) => [`${Number(val).toFixed(1)}%`, 'Capaian Omzet']}
+                            formatter={(val: any, name: any, props: any) => {
+                              const isMou = props?.payload?.isMou;
+                              return [`${Number(val).toFixed(1)}%`, isMou ? 'Capaian MoU' : 'Capaian Target'];
+                            }}
                         />
                         <Bar 
                           dataKey="achievementPct" 
@@ -1418,9 +1421,9 @@ export function OverviewClient({
               color="#534AB7"
             />
             <KpiCard 
-              icon={Users} 
-              label="Total Closing MoU" 
-              value={mouProgramHealths.reduce((s, ph) => s + (ph.calculatedMetrics?.user_count || ph.calculatedMetrics?.user_acquisition || 0), 0)}
+              icon={Handshake} 
+              label="Tanda Tangan MoU" 
+              value={mouProgramHealths.reduce((s, ph) => s + (ph.calculatedMetrics?.user_count || ph.calculatedMetrics?.user_acquisition || ph.calculatedMetrics?.mou_signed || 0), 0)}
               sub="akumulasi periode ini"
               accentColor="#639922"
             />
@@ -1432,11 +1435,16 @@ export function OverviewClient({
               accentColor="#378ADD"
             />
             <KpiCard 
-              icon={Handshake} 
-              label="Program Kerja Sama" 
-              value={mouProgramHealths.length}
-              sub="aktif dalam sistem"
-              accentColor="#534AB7"
+              icon={TrendingUp} 
+              label="Lead to MoU Rate" 
+              value={(() => {
+                const totalLeads = mouProgramHealths.reduce((s, ph) => s + (ph.calculatedMetrics?.leads || ph.calculatedMetrics?.agreement_leads || 0), 0)
+                const totalSigned = mouProgramHealths.reduce((s, ph) => s + (ph.calculatedMetrics?.user_count || ph.calculatedMetrics?.user_acquisition || ph.calculatedMetrics?.mou_signed || 0), 0)
+                const rate = totalLeads > 0 ? (totalSigned / totalLeads) * 100 : 0
+                return rate.toFixed(1) + "%"
+              })()}
+              sub="Rasio prospek jadi MoU"
+              accentColor="#8B5CF6"
             />
           </div>
 
@@ -1454,10 +1462,11 @@ export function OverviewClient({
             {/* MoU Aggregates Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-slate-50/30">
               <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-sm">
-                <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Closing MoU</p>
+                <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1">Total Tanda Tangan MoU</p>
                 <div className="text-2xl font-black text-[#111827]">
                   {mouProgramHealths.reduce((sum, ph) => {
-                    return sum + (ph.calculatedMetrics?.user_count || ph.calculatedMetrics?.user_acquisition || 0)
+                    const metrics = ph.calculatedMetrics || {}
+                    return sum + (metrics.user_count || metrics.user_acquisition || metrics.mou_signed || 0)
                   }, 0)}
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1 font-medium italic">Akumulasi seluruh program MoU</p>
@@ -1492,8 +1501,9 @@ export function OverviewClient({
                   <tr className="border-b border-[#E5E7EB] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
                     <th className="px-6 py-4">Program</th>
                     <th className="px-6 py-4">PIC / Team</th>
-                    <th className="px-6 py-4 text-center">Closing / User</th>
-                    <th className="px-6 py-4 text-center">Milestones</th>
+                    <th className="px-6 py-4 text-center">Prospek</th>
+                    <th className="px-6 py-4 text-center">Tanda Tangan / Agreement</th>
+                    <th className="px-6 py-4 text-center">Konversi (%)</th>
                     <th className="px-6 py-4 text-center">Health</th>
                     <th className="px-6 py-4 text-center">Status</th>
                   </tr>
@@ -1510,17 +1520,10 @@ export function OverviewClient({
                       .filter(ph => isMouProgram(ph.program.program_metric_definitions || []))
                       .map(ph => {
                         const metrics = ph.calculatedMetrics || {}
-                        const userActual = metrics.user_count || metrics.user_acquisition || 0
-                        const userTarget = ph.absoluteTargets?.user_count || ph.absoluteTargets?.user_acquisition || 0
+                        const userActual = metrics.mou_signed || metrics.user_count || metrics.user_acquisition || 0
+                        const userTarget = ph.absoluteTargets?.mou_signed || ph.absoluteTargets?.user_count || ph.absoluteTargets?.user_acquisition || 0
                         const userPct = userTarget > 0 ? (userActual / userTarget) * 100 : 0
                         
-                        const programMilestones = ph.program.program_milestones || []
-                        const completedMilestones = programMilestones.filter(m => 
-                          milestoneCompletions.some(mc => mc.milestone_id === m.id)
-                        ).length
-                        const totalMilestones = programMilestones.length
-                        const milestonePct = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
-
                         const pics = (ph.program.program_pics || [])
                           .map(pic => profiles.find(pr => pr.id === pic.profile_id))
                           .filter(Boolean)
@@ -1549,34 +1552,38 @@ export function OverviewClient({
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
-                                <div className="flex justify-between w-full text-[11px] font-bold">
-                                  <span className="text-[#111827]">{userActual}</span>
-                                  <span className="text-slate-400">/ {userTarget}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                  <div 
-                                    className={cn("h-full transition-all duration-1000", getProgressColor(userPct))}
-                                    style={{ width: `${Math.min(userPct, 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col items-center gap-1.5 min-w-[100px]">
-                                <div className="flex justify-between w-full text-[11px] font-bold">
-                                  <span className="text-slate-700">{completedMilestones}</span>
-                                  <span className="text-slate-400">/ {totalMilestones}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-[#534AB7] opacity-80 transition-all duration-1000"
-                                    style={{ width: `${Math.min(milestonePct, 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
+                            <td className="px-6 py-4 text-center">
+                               <div className="font-bold text-[#111827]">{metrics.agreement_leads || metrics.leads || 0}</div>
+                               <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                 Target: {ph.absoluteTargets?.agreement_leads || ph.absoluteTargets?.leads || 0}
+                               </div>
+                             </td>
+                             <td className="px-6 py-4">
+                               <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
+                                 <div className="flex justify-between w-full text-[11px] font-bold">
+                                   <span className="text-[#111827] text-center w-full">{userActual} <span className="text-slate-400 font-normal">/ {userTarget}</span></span>
+                                 </div>
+                                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                   <div 
+                                     className={cn("h-full transition-all duration-1000", getProgressColor(userPct))}
+                                     style={{ width: `${Math.min(userPct, 100)}%` }}
+                                   />
+                                 </div>
+                               </div>
+                             </td>
+                             <td className="px-6 py-4 text-center">
+                               {(() => {
+                                 const leads = metrics.agreement_leads || metrics.leads || 0
+                                 const signed = userActual
+                                 const rate = leads > 0 ? (signed / leads) * 100 : 0
+                                 return (
+                                   <div className="flex flex-col items-center">
+                                      <span className="text-sm font-bold text-indigo-600">{rate.toFixed(1)}%</span>
+                                      <span className="text-[9px] text-slate-400 uppercase font-black tracking-tighter">Lead to MoU</span>
+                                   </div>
+                                 )
+                               })()}
+                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className="text-sm font-bold text-[#111827] tabular-nums">{Math.round(ph.healthScore)}%</span>
                             </td>

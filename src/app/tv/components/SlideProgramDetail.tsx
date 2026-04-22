@@ -195,7 +195,7 @@ export function SlideProgramDetail({
           <div>
             <div className="flex items-center gap-3 mb-1">
                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-                 {isMoU ? 'MoU / Kerja Sama' : isQualitative ? 'Kualitatif' : 'Performance'}
+                 {isMoU ? 'MoU / Partnership' : isQualitative ? 'Kualitatif' : 'Performance'}
                </span>
                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Data Monitoring</span>
             </div>
@@ -214,7 +214,7 @@ export function SlideProgramDetail({
 
         <div className="flex flex-col items-end shrink-0">
           <div className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] mb-1">
-            {isMoU ? 'Partnership Status' : 'Yield Performance'}
+            {isMoU ? 'Partnership Health' : 'Yield Performance'}
           </div>
           <div className="text-7xl font-black leading-none tracking-tighter" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isQualitative || isMoU ? '#a78bfa' : '#ffffff' }}>
             {program.health.healthScore.toFixed(1)}<span className="text-3xl" style={{ color: '#64748b' }}>%</span>
@@ -421,7 +421,7 @@ export function SlideProgramDetail({
             <div className="flex-1 flex flex-col gap-4">
                <Card className="flex-1 flex flex-col items-center justify-center bg-slate-900 border-indigo-500/20 opacity-50">
                   <TrendingUp className="h-16 w-16 text-indigo-500 mb-4" />
-                  <p className="text-lg font-black uppercase tracking-widest">
+                  <p className="text-lg font-black uppercase tracking-widest text-center">
                     {isMoU ? 'Partnership in Progress' : 'Kualitatif Program'}
                   </p>
                   <p className="text-sm text-slate-500">Memonitor progres berdasarkan milestone</p>

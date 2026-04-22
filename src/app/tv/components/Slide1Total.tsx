@@ -19,7 +19,7 @@ export function Slide1Total({ data }: Slide1Props) {
   // Define display config for metric groups
   const groupConfig: Record<string, { label: string, icon: LucideIcon, color: string, isCurrency: boolean }> = {
     revenue: { label: 'Total Pendapatan', icon: Target, color: 'text-indigo-400', isCurrency: true },
-    user_acquisition: { label: 'Total User/Closing', icon: Users, color: 'text-cyan-400', isCurrency: false },
+    user_acquisition: { label: 'Total User / Agreement', icon: Users, color: 'text-cyan-400', isCurrency: false },
     leads: { label: 'Total Leads', icon: TrendingUp, color: 'text-emerald-400', isCurrency: false },
     ad_spend: { label: 'Total Ad Spend', icon: Activity, color: 'text-rose-400', isCurrency: true },
     efficiency: { label: 'Rata-rata ROAS', icon: Activity, color: 'text-amber-400', isCurrency: false },

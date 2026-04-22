@@ -486,7 +486,9 @@ export function isMouProgram(metrics: MetricDefinition[]): boolean {
   
   // MoU program tracks users/closing but NOT revenue as a target
   const hasUserTarget = metrics.some(m => 
-    (m.metric_group === 'user_acquisition' || m.metric_key === 'user_count') && m.is_target_metric
+    (m.metric_group === 'user_acquisition' || 
+     ['user_count', 'mou_signed', 'agreement_count', 'closing'].includes(m.metric_key?.toLowerCase() || '')) && 
+    m.is_target_metric
   )
   const hasRevenueTarget = metrics.some(m => 
     (m.metric_group === 'revenue' || m.metric_key === 'revenue') && m.is_target_metric

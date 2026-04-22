@@ -11,6 +11,8 @@ interface Program {
   name: string
   department?: string | null
   target_type?: string | null
+  monthly_target_rp?: number | null
+  monthly_target_user?: number | null
   program_milestones?: { id: string; title: string; display_order?: number | null }[]
   program_metric_definitions?: {
     id: string
@@ -21,6 +23,7 @@ interface Program {
     is_target_metric: boolean
     metric_group?: string | null
     unit_label?: string | null
+    monthly_target?: number | null
   }[]
 }
 
@@ -78,26 +81,110 @@ function formatPeriod(period: ActivePeriod): string {
   return `${months[period.month - 1]} ${period.year}`
 }
 
+function formatRupiahExport(value: number): string {
+  return `Rp ${value.toLocaleString('id-ID')}`
+}
 
+function isMouProgramHelper(defs: Program['program_metric_definitions']): boolean {
+  if (!defs || defs.length === 0) return false
+  return defs.some(d =>
+    d.metric_key === 'mou_signed' ||
+    d.metric_key === 'agreement_leads' ||
+    d.metric_group === 'mou'
+  )
+}
+
+// ── KPI Computation (mirrors overviewMetrics in dashboard-client) ────────────
+
+interface ComputedKPIs {
+  totalRevenue: number
+  totalRevenueTarget: number
+  proyeksiAkhirBulan: number
+  paceHarian: number
+  dailyTargetGlobal: number
+  programBerisiko: number
+  programTercapai: number
+}
+
+function computeKPIs(
+  programHealths: ProgramHealth[],
+  dailyInputs: DailyInput[],
+  metricValues: MetricValue[],
+  activePeriod: ActivePeriod
+): ComputedKPIs {
+  // Calculate total revenue actual from all programs
+  const totalRevenue = programHealths.reduce((sum, ph) => {
+    const m = ph.calculatedMetrics || {}
+    return sum + (m.revenue ?? m.omzet ?? 0)
+  }, 0)
+
+  const totalRevenueTarget = programHealths.reduce((sum, ph) => {
+    const t = ph.absoluteTargets || {}
+    return sum + (t.revenue ?? t.omzet ?? 0)
+  }, 0)
+
+  const workingDays = activePeriod.working_days || 30
+  const totalCalendarDays = new Date(activePeriod.year, activePeriod.month, 0).getDate()
+  const today = new Date()
+  const calendarElapsed =
+    today.getFullYear() === activePeriod.year && today.getMonth() + 1 === activePeriod.month
+      ? today.getDate()
+      : today.getFullYear() > activePeriod.year ||
+        (today.getFullYear() === activePeriod.year && today.getMonth() + 1 > activePeriod.month)
+      ? totalCalendarDays
+      : 0
+
+  const workingDaysElapsed = Math.min(workingDays, Math.round((calendarElapsed / totalCalendarDays) * workingDays))
+  const paceHarian = workingDaysElapsed > 0 ? totalRevenue / workingDaysElapsed : totalRevenue
+  const proyeksiAkhirBulan = paceHarian * workingDays
+  const dailyTargetGlobal = workingDays > 0 ? totalRevenueTarget / workingDays : 0
+
+  const programBerisiko = programHealths.filter(ph => ph.healthScore < 50).length
+  const programTercapai = programHealths.filter(ph => ph.healthScore >= 100).length
+
+  return {
+    totalRevenue,
+    totalRevenueTarget,
+    proyeksiAkhirBulan,
+    paceHarian,
+    dailyTargetGlobal,
+    programBerisiko,
+    programTercapai,
+  }
+}
 
 // ── Sheet 1: Dashboard Summary ────────────────────────────────────────────────
 
 function buildSummarySheet(
   programHealths: ProgramHealth[],
   milestoneCompletions: MilestoneCompletion[],
+  dailyInputs: DailyInput[],
+  metricValues: MetricValue[],
   activePeriod: ActivePeriod,
   globalHealth: number
 ): XLSX.WorkSheet {
   const title = `LAPORAN DASHBOARD KINERJA — ${formatPeriod(activePeriod)}`
+  const kpis = computeKPIs(programHealths, dailyInputs, metricValues, activePeriod)
 
-  // Global summary block
+  // Global summary block — includes new KPI cards
   const summaryBlock = [
     [title],
     [],
+    ['=== RINGKASAN GLOBAL ==='],
     ['Health Score Global', `${Math.round(globalHealth)}%`, getStatusLabel(globalHealth)],
     ['Total Program Aktif', programHealths.length],
-    ['Target Tercapai', programHealths.filter(ph => ph.healthScore >= 100).length],
-    ['Perlu Perhatian', programHealths.filter(ph => ph.healthScore < 60).length],
+    ['Target Tercapai (≥100%)', kpis.programTercapai],
+    ['Program Berisiko (<50%)', kpis.programBerisiko],
+    [],
+    ['=== PROYEKSI OMZET ==='],
+    ['Total Omzet Aktual (Periode)', formatRupiahExport(kpis.totalRevenue)],
+    ['Total Target Omzet (Periode)', formatRupiahExport(kpis.totalRevenueTarget)],
+    ['Pace Harian Rata-rata', formatRupiahExport(kpis.paceHarian)],
+    ['Target Harian Global', formatRupiahExport(kpis.dailyTargetGlobal)],
+    ['Proyeksi Omzet Akhir Bulan', formatRupiahExport(kpis.proyeksiAkhirBulan)],
+    ['Vs Target Bulanan', kpis.totalRevenueTarget > 0
+      ? `${((kpis.proyeksiAkhirBulan / kpis.totalRevenueTarget) * 100).toFixed(1)}%`
+      : '-'],
     [],
   ]
 
@@ -111,9 +198,9 @@ function buildSummarySheet(
     'Omzet Aktual',
     'Omzet Target',
     'Omzet %',
-    'User/Peserta Aktual',
-    'User/Peserta Target',
-    'User %',
+    'User / Agreement Aktual',
+    'User / Agreement Target',
+    'User / Agreement %',
     'Milestone Selesai',
     'Total Milestone',
     'Milestone %',
@@ -123,13 +210,21 @@ function buildSummarySheet(
     const p = ph.program
     const metrics = ph.calculatedMetrics || {}
     const targets = ph.absoluteTargets || {}
+    const isMoU = p.target_type === 'mou' || isMouProgramHelper(p.program_metric_definitions)
 
     const revActual = metrics.revenue ?? metrics.omzet ?? 0
     const revTarget = targets.revenue ?? targets.omzet ?? 0
     const revPct = revTarget > 0 ? (revActual / revTarget) : 0
 
-    const userActual = metrics.user_count ?? metrics.closing ?? 0
-    const userTarget = targets.user_count ?? targets.closing ?? 0
+    // For MoU, prioritize mou_signed or agreement metrics
+    const userActual = isMoU
+      ? (metrics.mou_signed ?? metrics.user_acquisition ?? metrics.user_count ?? 0)
+      : (metrics.user_count ?? metrics.closing ?? 0)
+
+    const userTarget = isMoU
+      ? (targets.mou_signed ?? targets.user_acquisition ?? targets.user_count ?? 0)
+      : (targets.user_count ?? targets.closing ?? 0)
+
     const userPct = userTarget > 0 ? (userActual / userTarget) : 0
 
     const milestones = p.program_milestones || []
@@ -142,7 +237,7 @@ function buildSummarySheet(
       idx + 1,
       p.name,
       p.department || '-',
-      ph.isQualitativeOnly ? 'Kualitatif' : 'Kuantitatif',
+      isMoU ? 'MoU / Kerja Sama' : ph.isQualitativeOnly ? 'Kualitatif' : 'Kuantitatif',
       ph.healthScore / 100,
       getStatusLabel(ph.healthScore),
       revActual || '',
@@ -162,9 +257,9 @@ function buildSummarySheet(
 
   // Column widths
   ws['!cols'] = [
-    { wch: 4 }, { wch: 30 }, { wch: 20 }, { wch: 15 },
+    { wch: 4 }, { wch: 30 }, { wch: 20 }, { wch: 18 },
     { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 10 },
-    { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 14 },
+    { wch: 22 }, { wch: 22 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 14 },
   ]
 
   // Merge title cell
@@ -431,7 +526,7 @@ function buildMilestoneSheet(
 
   const rows: (string | number | null)[][] = []
   qualitativePrograms.forEach(ph => {
-    const milestones = (ph.program.program_milestones || []).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    const milestones = [...(ph.program.program_milestones || [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
     milestones.forEach(ms => {
       const completion = milestoneCompletions.find(mc => mc.milestone_id === ms.id)
       rows.push([
@@ -456,6 +551,162 @@ function buildMilestoneSheet(
   return ws
 }
 
+// ── Sheet 5: MoU / Kerja Sama ─────────────────────────────────────────────────
+
+function buildMouSheet(
+  programHealths: ProgramHealth[],
+  metricValues: MetricValue[],
+  milestoneCompletions: MilestoneCompletion[],
+  activePeriod: ActivePeriod,
+): XLSX.WorkSheet {
+  const mouPrograms = programHealths.filter(ph =>
+    ph.program.target_type === 'mou' ||
+    isMouProgramHelper(ph.program.program_metric_definitions)
+  )
+
+  if (mouPrograms.length === 0) {
+    return XLSX.utils.aoa_to_sheet([['Tidak ada program MoU / Kerja Sama di periode ini.']])
+  }
+
+  const title = `LAPORAN PROGRAM MoU / KERJA SAMA — ${formatPeriod(activePeriod)}`
+
+  // Aggregate KPIs for MoU
+  const totalSigned = mouPrograms.reduce((sum, ph) => {
+    const m = ph.calculatedMetrics || {}
+    return sum + (m.mou_signed ?? m.user_count ?? m.user_acquisition ?? 0)
+  }, 0)
+  const totalLeads = mouPrograms.reduce((sum, ph) => {
+    const m = ph.calculatedMetrics || {}
+    return sum + (m.agreement_leads ?? m.leads ?? 0)
+  }, 0)
+  const avgHealth = mouPrograms.length > 0
+    ? mouPrograms.reduce((s, ph) => s + ph.healthScore, 0) / mouPrograms.length
+    : 0
+  const conversionRate = totalLeads > 0 ? (totalSigned / totalLeads) * 100 : 0
+
+  const totalMsAll = mouPrograms.reduce((s, ph) => s + (ph.program.program_milestones?.length || 0), 0)
+  const doneMsAll = mouPrograms.reduce((s, ph) => {
+    return s + (ph.program.program_milestones?.filter(m =>
+      milestoneCompletions.some(mc => mc.milestone_id === m.id && mc.is_completed)
+    ).length || 0)
+  }, 0)
+
+  const summaryBlock = [
+    [title],
+    [],
+    ['=== RINGKASAN MoU ==='],
+    ['Total Program MoU Aktif', mouPrograms.length],
+    ['Total Tanda Tangan / Agreement', totalSigned],
+    ['Total Prospek / Leads', totalLeads],
+    ['Lead to MoU Rate (Konversi)', totalLeads > 0 ? conversionRate / 100 : '-'],
+    ['Avg Health Score MoU', avgHealth / 100],
+    ['Milestone Selesai', `${doneMsAll} dari ${totalMsAll}`],
+    [],
+  ]
+
+  const headers = [
+    'No',
+    'Nama Program',
+    'Departemen',
+    'Health Score',
+    'Status',
+    'Prospek / Leads',
+    'Target Prospek',
+    'Prospek %',
+    'Tanda Tangan / MoU',
+    'Target Tanda Tangan',
+    'Agreement %',
+    'Konversi Lead→MoU',
+    'Milestone Selesai',
+    'Total Milestone',
+    'Milestone %',
+  ]
+
+  const rows = mouPrograms.map((ph, idx) => {
+    const m = ph.calculatedMetrics || {}
+    const t = ph.absoluteTargets || {}
+
+    const leads = m.agreement_leads ?? m.leads ?? 0
+    const targetLeads = t.agreement_leads ?? t.leads ?? 0
+    const leadsPct = targetLeads > 0 ? leads / targetLeads : 0
+
+    const signed = m.mou_signed ?? m.user_count ?? m.user_acquisition ?? 0
+    const targetSigned = t.mou_signed ?? t.user_count ?? t.user_acquisition ?? 0
+    const signedPct = targetSigned > 0 ? signed / targetSigned : 0
+
+    const conv = leads > 0 ? signed / leads : 0
+
+    const milestones = ph.program.program_milestones || []
+    const completedMs = milestones.filter(ms =>
+      milestoneCompletions.some(mc => mc.milestone_id === ms.id && mc.is_completed)
+    ).length
+    const msPct = milestones.length > 0 ? completedMs / milestones.length : 0
+
+    return [
+      idx + 1,
+      ph.program.name,
+      ph.program.department || '-',
+      ph.healthScore / 100,
+      getStatusLabel(ph.healthScore),
+      leads || '',
+      targetLeads || '',
+      targetLeads > 0 ? leadsPct : '',
+      signed || '',
+      targetSigned || '',
+      targetSigned > 0 ? signedPct : '',
+      leads > 0 ? conv : '',
+      completedMs || '',
+      milestones.length || '',
+      milestones.length > 0 ? msPct : '',
+    ]
+  })
+
+  const data = [...summaryBlock, headers, ...rows]
+  const ws = XLSX.utils.aoa_to_sheet(data)
+
+  ws['!cols'] = [
+    { wch: 4 }, { wch: 30 }, { wch: 20 },
+    { wch: 14 }, { wch: 18 },
+    { wch: 18 }, { wch: 16 }, { wch: 12 },
+    { wch: 22 }, { wch: 20 }, { wch: 14 },
+    { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 14 },
+  ]
+
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }]
+
+  // Format cells in data rows
+  const headerRowIdx = summaryBlock.length
+
+  // Format the aggregate KPI percentages in summaryBlock
+  // Row 6 (0-indexed) = Lead to MoU Rate
+  const convRateCell = XLSX.utils.encode_cell({ r: 6, c: 1 })
+  if (ws[convRateCell] && typeof ws[convRateCell].v === 'number') ws[convRateCell].z = '0.0%'
+  // Row 7 = Avg Health Score
+  const avgHealthCell = XLSX.utils.encode_cell({ r: 7, c: 1 })
+  if (ws[avgHealthCell] && typeof ws[avgHealthCell].v === 'number') ws[avgHealthCell].z = '0%'
+
+  for (let rowIdx = headerRowIdx + 1; rowIdx < data.length; rowIdx++) {
+    const r = rowIdx
+    // Health Score col 3
+    const healthCell = XLSX.utils.encode_cell({ r, c: 3 })
+    if (ws[healthCell]) ws[healthCell].z = '0%'
+    // Prospek % col 7
+    const leadsPctCell = XLSX.utils.encode_cell({ r, c: 7 })
+    if (ws[leadsPctCell] && typeof ws[leadsPctCell].v === 'number') ws[leadsPctCell].z = '0.0%'
+    // MoU % col 10
+    const signedPctCell = XLSX.utils.encode_cell({ r, c: 10 })
+    if (ws[signedPctCell] && typeof ws[signedPctCell].v === 'number') ws[signedPctCell].z = '0.0%'
+    // Konversi col 11
+    const convCell = XLSX.utils.encode_cell({ r, c: 11 })
+    if (ws[convCell] && typeof ws[convCell].v === 'number') ws[convCell].z = '0.0%'
+    // Milestone % col 14
+    const msPctCell = XLSX.utils.encode_cell({ r, c: 14 })
+    if (ws[msPctCell] && typeof ws[msPctCell].v === 'number') ws[msPctCell].z = '0.0%'
+  }
+
+  return ws
+}
+
 // ── Master Export Function ────────────────────────────────────────────────────
 
 export interface ExportParams {
@@ -473,7 +724,7 @@ export function exportDashboardToExcel(params: ExportParams): void {
   const wb = XLSX.utils.book_new()
 
   // Sheet 1: Summary
-  const summarySheet = buildSummarySheet(programHealths, milestoneCompletions, activePeriod, globalHealth)
+  const summarySheet = buildSummarySheet(programHealths, milestoneCompletions, dailyInputs, metricValues, activePeriod, globalHealth)
   XLSX.utils.book_append_sheet(wb, summarySheet, '📊 Ringkasan Dashboard')
 
   // Sheet 2: Raw Daily Data
@@ -487,6 +738,10 @@ export function exportDashboardToExcel(params: ExportParams): void {
   // Sheet 4: Milestones
   const milestoneSheet = buildMilestoneSheet(programHealths, milestoneCompletions)
   XLSX.utils.book_append_sheet(wb, milestoneSheet, '✅ Milestone')
+
+  // Sheet 5: MoU / Kerja Sama
+  const mouSheet = buildMouSheet(programHealths, metricValues, milestoneCompletions, activePeriod)
+  XLSX.utils.book_append_sheet(wb, mouSheet, '🤝 Program MoU')
 
   // Generate filename with period info
   const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
