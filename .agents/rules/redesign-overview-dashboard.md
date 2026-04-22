@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 # System Prompt — AI Agent Dashboard KPI Overview

@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: manual
 ---
 
 ## Full Project Context — Dashboard Update (Phase 2)

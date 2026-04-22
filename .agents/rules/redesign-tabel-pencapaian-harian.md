@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: manual
 ---
 
 ## Feature: Redesign Halaman Pencapaian Harian — Hybrid View

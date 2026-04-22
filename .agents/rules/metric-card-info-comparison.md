@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 You are a senior fullstack engineer. I need you to refactor and improve KPI dashboard metric logic and UI behavior.

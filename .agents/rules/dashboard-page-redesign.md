@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 ## Feature: Metric Groups, Adaptive Dashboard & Department Sub-Dashboard

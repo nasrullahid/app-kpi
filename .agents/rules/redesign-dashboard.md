@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 Redesign dashboard KPI yang sudah ada ini. Jangan ubah struktur atau logika data — hanya perbarui tampilan visualnya agar lebih profesional dan bersih.

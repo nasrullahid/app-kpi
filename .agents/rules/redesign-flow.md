@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 ## Major Refactor: Simplified Program Metrics + Dashboard Redesign
