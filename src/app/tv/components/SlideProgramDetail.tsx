@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { ProgramPerformance, DailyInput, Milestone, Period, MetricDefinition, MetricValue } from '../actions'
@@ -91,7 +91,8 @@ export function SlideProgramDetail({
   program, 
   period, 
   inputs, 
-  metricDefinitions
+  metricDefinitions,
+  metricValues
 }: SlideProgramDetailProps) {
   const [time, setTime]       = useState('')
 
@@ -110,13 +111,57 @@ export function SlideProgramDetail({
   const isQualitative = program.health.isQualitativeOnly
   const isMoU = (program.target_type as string) === 'mou'
 
+  // Build defId → metricKey map for this program
+  const defIdToKeyMap = useMemo(() => {
+    const map = new Map<string, string>()
+    metricDefinitions.forEach(d => map.set(d.id, d.metric_key))
+    return map
+  }, [metricDefinitions])
+
   // Daily processing for chart
   const dailyPoints = useMemo(() => {
+    // ── MoU: use custom metric values (mou_signed / agreement_leads) ──
+    if (isMoU) {
+      const signedDef = metricDefinitions.find(d =>
+        d.metric_key === 'mou_signed' || d.metric_key === 'user_count' || d.metric_key === 'user_acquisition'
+      )
+      const leadsDef = metricDefinitions.find(d =>
+        d.metric_key === 'agreement_leads' || d.metric_key === 'leads'
+      )
+
+      // Group by date
+      const dateMap = new Map<string, { signed: number; leads: number }>()
+      metricValues.forEach(mv => {
+        const key = defIdToKeyMap.get(mv.metric_definition_id)
+        if (!key) return
+        const val = Number(mv.value || 0)
+        const existing = dateMap.get(mv.date) || { signed: 0, leads: 0 }
+        if (signedDef && mv.metric_definition_id === signedDef.id) existing.signed += val
+        if (leadsDef && mv.metric_definition_id === leadsDef.id) existing.leads += val
+        dateMap.set(mv.date, existing)
+      })
+
+      const sorted = Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b))
+      let cumSigned = 0
+      let cumLeads = 0
+      return sorted.map(([date, vals]) => {
+        cumSigned += vals.signed
+        cumLeads += vals.leads
+        return {
+          date,
+          displayDate: new Date(date).getDate().toString(),
+          rp: vals.leads,        // reuse 'rp' slot for leads (bar)
+          user: vals.signed,     // reuse 'user' slot for signed (line)
+          cumRp: cumLeads,
+          cumUser: cumSigned,
+        }
+      })
+    }
+
+    // ── Legacy: use daily_inputs ──────────────────────────────────────
     const sortedInputs = [...inputs].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
-    
     let cumRp = 0
     let cumUser = 0
-    
     return sortedInputs.map(input => {
       cumRp += Number(input.achievement_rp || 0)
       cumUser += Number(input.achievement_user || 0)
@@ -126,10 +171,10 @@ export function SlideProgramDetail({
         rp: Number(input.achievement_rp || 0),
         user: Number(input.achievement_user || 0),
         cumRp,
-        cumUser
+        cumUser,
       }
     })
-  }, [inputs])
+  }, [isMoU, inputs, metricValues, metricDefinitions, defIdToKeyMap])
 
   // Target calculations
   const targetRp = Number(program.monthly_target_rp || 0)
@@ -265,7 +310,7 @@ export function SlideProgramDetail({
                     <Card className="p-5 flex flex-col justify-between border-purple-500/20 bg-slate-900/50">
                       <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">Target User</div>
                       <div className="flex flex-col gap-0.5 w-full" style={{ containerType: 'inline-size' }}>
-                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{achievementUser} <small className="text-xs">User</small></div>
+                         <div className="text-[min(2rem,14cqw)] font-black text-white whitespace-nowrap leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{achievementUser} <small className="text-xs">{isMoU ? 'Tanda Tangan' : 'User'}</small></div>
                          {targetUser > 0 && <div className="text-[10px] text-slate-500 uppercase mb-2">Goal: {targetUser} User</div>}
                       </div>
                       {targetUser > 0 && <ProgressBar pct={(achievementUser / targetUser) * 100} color="#a78bfa" />}
@@ -285,13 +330,13 @@ export function SlideProgramDetail({
                     <div className="flex items-center gap-6">
                        <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#639922' }} />
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{isMoU ? 'Prospek' : 'Omzet'}</span>
                        </div>
                        <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#378ADD' }} />
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">User</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{isMoU ? 'Tanda Tangan' : 'User'}</span>
                        </div>
-                       {dailyTargetRp > 0 && (
+                       {!isMoU && dailyTargetRp > 0 && (
                          <div className="flex items-center gap-2">
                             <div className="w-3 h-1 rounded-full border-t border-dashed" style={{ borderColor: 'rgba(16, 185, 129, 0.6)' }} />
                             <span className="text-[10px] font-bold text-slate-400 uppercase">Target</span>
@@ -315,7 +360,7 @@ export function SlideProgramDetail({
                              axisLine={false} 
                              tickLine={false} 
                              tick={{ fill: '#64748b', fontSize: 10 }}
-                             tickFormatter={(val) => val >= 1000000 ? `Rp${(val/1000000).toFixed(1)}jt` : `Rp${(val/1000).toFixed(0)}rb`}
+                             tickFormatter={(val) => isMoU ? Math.round(val).toString() : val >= 1000000 ? `Rp${(val/1000000).toFixed(1)}jt` : `Rp${(val/1000).toFixed(0)}rb`}
                              domain={[0, 'auto']}
                           />
                           <YAxis 
@@ -333,14 +378,15 @@ export function SlideProgramDetail({
                              formatter={(v: string | number | readonly (string | number)[] | undefined, name: string | number | undefined): [string | number, string | number] => {
                                const val = Array.isArray(v) ? v[0] : v
                                const n = String(name || '')
-                               if (n === 'Omzet') return [formatRupiah(Number(val || 0)), 'Omzet']
+                               if (isMoU) return [String(Math.round(Number(val || 0))), n]
+                                if (n === 'Omzet') return [formatRupiah(Number(val || 0)), 'Omzet']
                                return [String(val ?? ''), n]
                              }}
                           />
                           <Bar 
                              yAxisId="left" 
                              dataKey="rp" 
-                             name="Omzet"
+                             name={isMoU ? 'Prospek' : 'Omzet'}
                              fill="#639922" 
                              radius={[4, 4, 0, 0]} 
                              isAnimationActive={false}
@@ -349,14 +395,14 @@ export function SlideProgramDetail({
                              yAxisId="right" 
                              type="monotone" 
                              dataKey="user" 
-                             name="User"
+                             name={isMoU ? 'Tanda Tangan' : 'User'}
                              stroke="#378ADD" 
                              strokeWidth={4} 
                              dot={{ r: 4, fill: '#378ADD', strokeWidth: 2, stroke: '#020617' }}
                              isAnimationActive={false}
                              className="drop-shadow-[0_0_8px_rgba(55,138,221,0.4)]"
                           />
-                          {dailyTargetRp > 0 && (
+                          {!isMoU && dailyTargetRp > 0 && (
                              <ReferenceLine 
                                 yAxisId="left"
                                 y={dailyTargetRp} 
