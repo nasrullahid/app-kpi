@@ -201,7 +201,7 @@ function buildSummarySheet(
     ['Target Harian Global', formatRupiahExport(kpis.dailyTargetGlobal)],
     ['Proyeksi Omzet Akhir Bulan', formatRupiahExport(kpis.proyeksiAkhirBulan)],
     ['Vs Target Bulanan', kpis.totalRevenueTarget > 0
-      ? `${((kpis.proyeksiAkhirBulan / kpis.totalRevenueTarget) * 100).toFixed(1)}%`
+      ? `${((kpis.totalRevenue / kpis.totalRevenueTarget) * 100).toFixed(1)}%`
       : '-'],
     [],
   ]
