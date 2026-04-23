@@ -6,6 +6,11 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
 
 export type ActionResponse = { error: string } | { success: boolean; data?: unknown }
+export interface ProspekNote {
+  [key: string]: string | undefined
+  institusi: string
+  catatan: string
+}
 
 async function checkAccess(supabase: SupabaseClient<Database>, userId: string, programId: string) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
@@ -52,6 +57,7 @@ export async function submitDailyInput(data: {
   prospek_drop?: number | null
   qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null
   notes?: string | null
+  prospek_notes?: ProspekNote[] | null
 }): Promise<ActionResponse> {
   const supabase = createClient()
   
@@ -130,6 +136,7 @@ export async function updateDailyInput(id: string, data: {
   prospek_drop?: number | null
   qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null
   notes?: string | null
+  prospek_notes?: ProspekNote[] | null
 }): Promise<ActionResponse> {
   const supabase = createClient()
   
@@ -174,7 +181,7 @@ export async function updateDailyInput(id: string, data: {
     }
   }
 
-  let query = supabase.from('daily_inputs').update(data).eq('id', id)
+  let query = supabase.from('daily_inputs').update(data as Database['public']['Tables']['daily_inputs']['Update']).eq('id', id)
   
   if (!isAdmin) {
     query = query.eq('created_by', user.id)

@@ -51,6 +51,8 @@ interface DailyInput {
   achievement_user?: number | null
   qualitative_status?: string | null
   notes?: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prospek_notes?: any[] | null
 }
 
 interface MilestoneCompletion {
@@ -347,7 +349,8 @@ function buildDailyDataSheet(
     'Omzet (Legacy Rp)',
     'User (Legacy)',
     'Status Kualitatif',
-    'Catatan',
+    'Catatan Umum',
+    'Log Aktivitas Prospek (MoU)',
     // Dynamic custom metrics
     ...metricKeysArr.map(k => metricLabelMap[k] || k),
   ]
@@ -396,6 +399,10 @@ function buildDailyDataSheet(
         legacyInput?.achievement_user ?? '',
         legacyInput?.qualitative_status ?? '',
         legacyInput?.notes ?? '',
+        legacyInput?.prospek_notes 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? (legacyInput.prospek_notes as any[]).map(n => `[${n.institusi}]: ${n.catatan}`).join(' | ')
+          : '',
         ...metricKeysArr.map(k => metricValueMap.get(`${programId}|${date}|${k}`) ?? ''),
       ]
       rows.push(row)

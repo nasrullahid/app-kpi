@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { submitDailyInput, updateDailyInput, deleteDailyInput, submitMilestoneCompletion, submitDailyMetricValues } from './actions'
+import { submitDailyInput, updateDailyInput, deleteDailyInput, submitMilestoneCompletion, submitDailyMetricValues, ProspekNote } from './actions'
 import { Database } from '@/types/database'
 import { formatRupiah, cn } from '@/lib/utils'
 import { isAdsProgram } from '@/lib/dashboard-calculator'
@@ -73,12 +73,22 @@ export function InputFormClient({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedProgramId, setSelectedProgramId] = useState<string>(programs[0]?.id || '')
   
-  // Dynamic metric state: { metric_definition_id: value_string }
   const [metricValues, setMetricValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {}
     existingMetricValues.forEach(mv => { init[mv.metric_definition_id] = mv.value?.toString() || '' })
     return init
   })
+
+  // Phase 2.1: Prospek Notes for MoU
+  const [prospekNotes, setProspekNotes] = useState<ProspekNote[]>([])
+
+  const addProspekNote = () => setProspekNotes([...prospekNotes, { institusi: '', catatan: '' }])
+  const removeProspekNote = (index: number) => setProspekNotes(prospekNotes.filter((_, i) => i !== index))
+  const updateProspekNote = (index: number, field: 'institusi' | 'catatan', value: string) => {
+    const newNotes = [...prospekNotes]
+    newNotes[index] = { ...newNotes[index], [field]: value }
+    setProspekNotes(newNotes)
+  }
 
   const isLocked = (activePeriod as unknown as { is_locked: boolean | null })?.is_locked
 
@@ -149,6 +159,7 @@ export function InputFormClient({
     }
     setEditingId(null)
     setSelectedProgramId(programs[0]?.id || '')
+    setProspekNotes([])
     setIsModalOpen(true)
   }
 
@@ -159,6 +170,10 @@ export function InputFormClient({
     }
     setEditingId(input.id)
     setSelectedProgramId(input.program_id)
+    
+    // Load prospek_notes if they exist
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setProspekNotes((input.prospek_notes as any[]) || [])
     
     // Load existing metric values for this specific input (date + program)
     const init: Record<string, string> = {}
@@ -210,6 +225,7 @@ export function InputFormClient({
         date: formData.get('date') as string,
         notes: formData.get('notes') as string,
         prospek_drop: formData.get('prospek_drop') ? Number(formData.get('prospek_drop')) : 0,
+        prospek_notes: activeProgram?.target_type === 'mou' ? prospekNotes : null,
       }
 
       if (!editingId) {
@@ -276,9 +292,11 @@ export function InputFormClient({
 
       let res;
       if (editingId) {
-        res = await updateDailyInput(editingId, payload as { date: string; achievement_rp?: number | null; achievement_user?: number | null; prospek_drop?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        res = await updateDailyInput(editingId, payload as any)
       } else {
-        res = await submitDailyInput(payload as { program_id: string; date: string; achievement_rp?: number | null; achievement_user?: number | null; prospek_drop?: number | null; qualitative_status?: 'not_started' | 'in_progress' | 'completed' | null; notes?: string | null })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        res = await submitDailyInput(payload as any)
       }
 
       if ('error' in res && res.error) {
@@ -863,6 +881,63 @@ export function InputFormClient({
                             </div>
                           )
                         })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phase 2.1: Prospek Notes for MoU */}
+                  {activeProgram?.target_type === 'mou' && (
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                      <div className="flex items-center justify-between pl-1">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                          <ClipboardList className="h-3 w-3" /> Update Prospek Hari Ini (Opsional)
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={addProspekNote}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                        >
+                          + Tambah Institusi
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {prospekNotes.length === 0 ? (
+                          <div className="text-[10px] text-slate-400 italic bg-slate-50/30 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                            Belum ada catatan prospek. Klik tambah untuk mencatat institusi yang diproses hari ini.
+                          </div>
+                        ) : (
+                          prospekNotes.map((note, idx) => (
+                            <div key={idx} className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 relative group shadow-sm transition-all hover:border-blue-200">
+                              <button 
+                                type="button"
+                                onClick={() => removeProspekNote(idx)}
+                                className="absolute -top-2 -right-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 p-1 rounded-full shadow-sm z-10 transition-colors"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                              <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nama Institusi / Prospek</label>
+                                <input 
+                                  type="text"
+                                  value={note.institusi}
+                                  onChange={(e) => updateProspekNote(idx, 'institusi', e.target.value)}
+                                  placeholder="Contoh: PT Angin Ribut"
+                                  className="w-full text-xs font-bold rounded-lg border border-slate-100 px-3 py-2.5 focus:border-blue-400 outline-none bg-slate-50/50 transition-all"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Update / Catatan Progres</label>
+                                <textarea 
+                                  value={note.catatan}
+                                  onChange={(e) => updateProspekNote(idx, 'catatan', e.target.value)}
+                                  placeholder="Contoh: Sudah presentasi, menunggu keputusan direksi minggu depan."
+                                  className="w-full text-xs font-medium rounded-lg border border-slate-100 px-3 py-2.5 focus:border-blue-400 outline-none bg-slate-50/50 min-h-[60px] transition-all"
+                                />
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   )}

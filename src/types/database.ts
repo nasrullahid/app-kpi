@@ -26,6 +26,7 @@ export type Database = {
           period_id: string
           program_id: string
           prospek_drop: number
+          prospek_notes: Json | null
           qualitative_status:
             | Database["public"]["Enums"]["qualitative_status"]
             | null
@@ -42,6 +43,7 @@ export type Database = {
           period_id: string
           program_id: string
           prospek_drop?: number
+          prospek_notes?: Json | null
           qualitative_status?:
             | Database["public"]["Enums"]["qualitative_status"]
             | null
@@ -58,6 +60,7 @@ export type Database = {
           period_id?: string
           program_id?: string
           prospek_drop?: number
+          prospek_notes?: Json | null
           qualitative_status?:
             | Database["public"]["Enums"]["qualitative_status"]
             | null

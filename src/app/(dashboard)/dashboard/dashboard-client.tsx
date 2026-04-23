@@ -24,9 +24,8 @@ import {
 import {
   HeartPulse, Layers, Target, CheckSquare,
   Search, ArrowUpRight, ArrowDownRight, TrendingUp, Handshake, FileDown,
-  Info, CircleDollarSign, AlertTriangle
+  Info, CircleDollarSign, AlertTriangle, ClipboardList
 } from 'lucide-react'
-
 import { DashboardSummary } from '@/lib/dashboard-service'
 import { RadialProgressCard } from '@/components/dashboard/radial-progress-card'
 import {
@@ -570,7 +569,8 @@ export function OverviewClient({
     exportDashboardToExcel({
       programHealths,
       metricValues,
-      dailyInputs,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dailyInputs: dailyInputs as any,
       milestoneCompletions,
       activePeriod,
       globalHealth: globalKPIs.avgHealth,
@@ -1557,6 +1557,67 @@ export function OverviewClient({
               tooltip="Dihitung dari total akumulasi, bukan per periode. Akurasi meningkat seiring waktu setelah data terkumpul."
               accentColor="#8B5CF6"
             />
+          </div>
+
+          {/* Phase 2.1: Recent Activity Feed */}
+          <div className="bg-white p-6 rounded-xl border border-[#E5E7EB] shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-6">
+              <ClipboardList className="h-4 w-4 text-blue-500" />
+              Catatan Prospek Terbaru (Seluruh Program)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(() => {
+                const allNotes: { programName: string, date: string, institusi: string, catatan: string }[] = []
+                dailyInputs
+                  .filter(di => {
+                    const prog = programs.find(p => p.id === di.program_id)
+                    return prog && isMouProgram(prog.program_metric_definitions || []) && di.prospek_notes
+                  })
+                  .forEach(di => {
+                    const prog = programs.find(p => p.id === di.program_id)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ;(di.prospek_notes as any[]).forEach(note => {
+                      allNotes.push({
+                        programName: prog?.name || 'Unknown',
+                        date: di.date,
+                        institusi: note.institusi,
+                        catatan: note.catatan
+                      })
+                    })
+                  })
+                
+                return allNotes
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 6)
+                  .map((note, idx) => (
+                    <div key={idx} className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 hover:border-blue-200 transition-all group">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-[9px] font-black text-blue-600 uppercase tracking-tighter bg-blue-50 px-1.5 py-0.5 rounded">
+                          {note.programName}
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-400">
+                          {new Date(note.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                        </div>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 mb-1 line-clamp-1">{note.institusi}</div>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 italic group-hover:line-clamp-none transition-all">
+                        &ldquo;{note.catatan}&rdquo;
+                      </p>
+                    </div>
+                  ))
+              })()}
+              
+              {dailyInputs.filter(di => {
+                 const p = programs.find(p => p.id === di.program_id)
+                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 return p && isMouProgram(p.program_metric_definitions || []) && di.prospek_notes && (di.prospek_notes as any[]).length > 0
+              }).length === 0 && (
+                <div className="col-span-full py-12 text-center text-slate-400 italic text-sm">
+                  Belum ada aktivitas prospek yang dicatat.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-sm">

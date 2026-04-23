@@ -9,7 +9,8 @@ import {
   Target, 
   TrendingUp, 
   BarChart3, 
-  CheckCircle
+  CheckCircle,
+  ClipboardList
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatMetricValue } from '@/lib/formula-evaluator'
@@ -250,6 +251,48 @@ export function ProgramDetailView({ program, health, metricValues, dailyInputs }
           </div>
         </div>
       </div>
+
+      {/* Phase 2.1: Activity Log for MoU */}
+      {program.target_type === 'mou' && (
+        <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-blue-500" />
+            Log Aktivitas Prospek
+          </h3>
+          
+          <div className="space-y-6">
+            {dailyInputs
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .filter(di => di.program_id === program.id && di.prospek_notes && (di.prospek_notes as any[]).length > 0)
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((input, idx) => (
+                <div key={idx} className="relative pl-6 border-l-2 border-slate-100 space-y-3">
+                  <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-white border-2 border-blue-500" />
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    {new Date(input.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {(input.prospek_notes as any[]).map((note, nIdx) => (
+                      <div key={nIdx} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="text-[11px] font-bold text-slate-900 mb-1">{note.institusi}</div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed italic">&ldquo;{note.catatan}&rdquo;</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {dailyInputs.filter(di => di.program_id === program.id && di.prospek_notes && (di.prospek_notes as any[]).length > 0).length === 0 && (
+              <div className="text-center py-8 opacity-40">
+                <p className="text-xs font-bold text-slate-400">Belum ada log aktivitas prospek untuk periode ini.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
