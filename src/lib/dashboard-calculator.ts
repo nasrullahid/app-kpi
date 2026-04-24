@@ -409,7 +409,8 @@ export function aggregateByMetricGroup(
 
     // Update global aggregates
     const processGroup = (g: string, data: { actual: number, target: number, absolute: number, found: boolean }) => {
-      if (data.found) {
+      // Include in totals if either data was found OR a target exists
+      if (data.found || data.absolute > 0) {
         existingGroups.add(g)
         groupRawTotals[g].actual += data.actual
         
@@ -701,7 +702,9 @@ export function aggregateGlobalKPIs(
   const totalPrograms = programs.length
   const activeProgramsCount = programs.filter(p => 
     (p.program_metric_definitions?.length || 0) > 0 || 
-    (p.program_milestones?.length || 0) > 0
+    (p.program_milestones?.length || 0) > 0 ||
+    (p.monthly_target_rp || 0) > 0 ||
+    (p.monthly_target_user || 0) > 0
   ).length
   
   const avgHealth = programResults.length > 0 
