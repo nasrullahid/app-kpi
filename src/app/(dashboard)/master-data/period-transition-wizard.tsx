@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { setActivePeriod, activatePeriodWithDecisions } from './actions'
+import { activatePeriodWithDecisions } from './actions'
 import { Database } from '@/types/database'
 import { formatMonth, formatRupiah } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -79,24 +79,6 @@ interface PeriodTransitionWizardProps {
   onSuccess: () => void
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-function healthColor(score: number) {
-  if (score >= 80) return { text: '#1D9E75', bg: '#E1F5EE', label: 'Sehat' }
-  if (score >= 50) return { text: '#EF9F27', bg: '#FAEEDA', label: 'Perlu Perhatian' }
-  return { text: '#E24B4A', bg: '#FCEBEB', label: 'Kritis' }
-}
-
-// ── ProgressBar ───────────────────────────────────────────────────────────────
-function ProgressBar({ pct, color }: { pct: number; color: string }) {
-  return (
-    <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${Math.min(pct * 100, 100)}%`, background: color }}
-      />
-    </div>
-  )
-}
 
 // ── StepIndicator ─────────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: number }) {

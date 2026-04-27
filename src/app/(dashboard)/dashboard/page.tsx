@@ -13,7 +13,6 @@ export default async function DashboardPage({
   searchParams: { startDate?: string; endDate?: string; periodId?: string }
 }) {
   const data = await getDashboardData(searchParams.startDate, searchParams.endDate, searchParams.periodId)
-  const isViewingHistory = !!searchParams.periodId && !data.activePeriod?.is_active
 
   const monthName = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(
     new Date(2024, (data.activePeriod?.month ?? 1) - 1, 1)
