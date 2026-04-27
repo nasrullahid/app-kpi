@@ -397,7 +397,9 @@ export function OverviewClient({
   // ── Calculated Data for Omzet Tab ──────────────────────────────────────────
   const filteredOmzetSummary = useMemo(() => {
     if (selectedOmzetProgramId === 'all') {
-      const revenueAchievement = (summary.aggregates.revenue.actual / (summary.aggregates.revenue.totalTarget || 1)) * 100
+      const revActual = summary.aggregates.revenue?.actual || 0
+      const revTarget = summary.aggregates.revenue?.totalTarget || 1
+      const revenueAchievement = (revActual / revTarget) * 100
       return {
         aggregates: summary.aggregates,
         health: revenueAchievement,
@@ -493,7 +495,7 @@ export function OverviewClient({
 
   const omzetSummary = filteredOmzetSummary || { 
     aggregates: summary.aggregates, 
-    health: (summary.aggregates.revenue.actual / (summary.aggregates.revenue.totalTarget || 1)) * 100,
+    health: ((summary.aggregates.revenue?.actual || 0) / (summary.aggregates.revenue?.totalTarget || 1)) * 100,
     targetTrend: summary.targetTrend, 
     previousAggregates: previousSummary?.aggregates 
   }
@@ -732,8 +734,8 @@ export function OverviewClient({
       : (today_revenue > 0 ? 100 : 0);
 
     // 2. Target Harian & Pace
-    const monthly_revenue = summary.aggregates.revenue.actual || 0;
-    const monthly_target = summary.aggregates.revenue.totalTarget || 0;
+    const monthly_revenue = summary.aggregates.revenue?.actual || 0;
+    const monthly_target = summary.aggregates.revenue?.totalTarget || 0;
     const workingDays = activePeriod.working_days || 30;
     const daily_target_global = workingDays > 0 ? monthly_target / workingDays : 0;
 
@@ -775,7 +777,7 @@ export function OverviewClient({
       yesterday_revenue,
       growth_vs_kemarin
     }
-  }, [activePeriod, summary.targetTrend, summary.aggregates.revenue, programHealths, dailyInputs, metricValues]);
+  }, [activePeriod, summary.targetTrend, summary.aggregates.revenue?.actual, programHealths, dailyInputs, metricValues]);
 
   return (
     <div className="space-y-6 pb-24">
@@ -1213,7 +1215,7 @@ export function OverviewClient({
                   title="Revenue Progress"
                   value={omzetSummary.aggregates.revenue?.actual || 0}
                   target={omzetSummary.aggregates.revenue?.totalTarget || 0}
-                  percentage={(omzetSummary.aggregates.revenue?.actual / (omzetSummary.aggregates.revenue?.totalTarget || 1)) * 100}
+                  percentage={((omzetSummary.aggregates.revenue?.actual || 0) / (omzetSummary.aggregates.revenue?.totalTarget || 1)) * 100}
                   displayValue={formatRupiah(omzetSummary.aggregates.revenue?.actual || 0)}
                   displayTarget={formatRupiah(omzetSummary.aggregates.revenue?.totalTarget || 0)}
                   unitLabel="Rp"
