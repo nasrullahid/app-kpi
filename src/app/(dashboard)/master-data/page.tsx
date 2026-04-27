@@ -22,7 +22,7 @@ export default async function MasterDataPage({
   // Fetch Data
   const { data: programs } = await supabase
     .from('programs')
-    .select('*, program_pics(profile_id), program_milestones(*)')
+    .select('*, program_pics(profile_id), program_milestones(*), program_metric_definitions(*)')
     .order('created_at', { ascending: false })
 
   const { data: periods } = await supabase
@@ -78,7 +78,7 @@ export default async function MasterDataPage({
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'periode' ? (
-            <PeriodClient periods={periods || []} isAdmin={isAdmin} />
+            <PeriodClient periods={periods || []} programs={programs || []} isAdmin={isAdmin} />
           ) : (
             <ProgramClient 
               programs={programs || []} 

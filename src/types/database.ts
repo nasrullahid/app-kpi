@@ -150,6 +150,30 @@ export type Database = {
         }
         Relationships: []
       }
+      program_period_settings: {
+        Row: {
+          id: string
+          program_id: string
+          period_id: string
+          carry_over_from_period_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          program_id: string
+          period_id: string
+          carry_over_from_period_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          program_id?: string
+          period_id?: string
+          carry_over_from_period_id?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       programs: {
         Row: {
           created_at: string | null

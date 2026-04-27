@@ -10,9 +10,10 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { startDate?: string; endDate?: string }
+  searchParams: { startDate?: string; endDate?: string; periodId?: string }
 }) {
-  const data = await getDashboardData(searchParams.startDate, searchParams.endDate)
+  const data = await getDashboardData(searchParams.startDate, searchParams.endDate, searchParams.periodId)
+  const isViewingHistory = !!searchParams.periodId && !data.activePeriod?.is_active
 
   const monthName = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(
     new Date(2024, (data.activePeriod?.month ?? 1) - 1, 1)
@@ -20,7 +21,15 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6 mb-20">
-      {/* Header */}
+      {/* Historical period banner */}
+      {searchParams.periodId && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <div className="text-sm text-amber-800">
+            <span className="font-bold">Mode Laporan:</span> Anda sedang melihat data periode arsip.
+          </div>
+          <a href="/dashboard" className="text-xs font-bold text-amber-700 underline hover:text-amber-900">← Kembali ke Periode Aktif</a>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 text-slate-400">

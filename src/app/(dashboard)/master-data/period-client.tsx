@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { createPeriod, setActivePeriod, deletePeriod, updatePeriod, togglePeriodLock } from './actions'
+import { useRouter } from 'next/navigation'
+import { createPeriod, deletePeriod, updatePeriod, togglePeriodLock } from './actions'
 import { Database } from '@/types/database'
 import { formatMonth } from '@/lib/utils'
 import { toast } from 'sonner'
-import { 
+import { PeriodTransitionWizard } from './period-transition-wizard'
+import { BarChart2, 
   Lock, 
   Unlock, 
   Settings2, 
@@ -18,12 +20,17 @@ import {
 } from 'lucide-react'
 
 type Period = Database['public']['Tables']['periods']['Row']
+type Program = Database['public']['Tables']['programs']['Row'] & {
+  program_metric_definitions?: Database['public']['Tables']['program_metric_definitions']['Row'][]
+}
 
-export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin: boolean }) {
+export function PeriodClient({ periods, programs, isAdmin }: { periods: Period[], programs: Program[], isAdmin: boolean }) {
+  const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingPeriod, setEditingPeriod] = useState<Period | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [wizardTargetPeriod, setWizardTargetPeriod] = useState<Period | null>(null)
 
   // Separate active and archived periods
   const activePeriod = periods.find(p => p.is_active)
@@ -62,24 +69,9 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
     }
   }
 
-  async function handleSetActive(id: string) {
+  function handleSetActive(period: Period) {
     if (!isAdmin) return
-    const confirmMsg = "Mengubah periode aktif akan mengubah tampilan dashboard untuk SEMUA pengguna secara global. Lanjutkan?"
-    if (!confirm(confirmMsg)) return
-
-    setIsLoading(true)
-    try {
-      const res = await setActivePeriod(id)
-      if ('error' in res && res.error) {
-        toast.error(res.error)
-      } else {
-        toast.success('Periode aktif berhasil diubah')
-      }
-    } catch {
-      toast.error('Gagal mengubah periode aktif')
-    } finally {
-      setIsLoading(false)
-    }
+    setWizardTargetPeriod(period)
   }
 
   async function handleDelete(id: string) {
@@ -153,12 +145,23 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
           </span>
         )}
       </td>
-      {isAdmin && (
-        <td className="px-6 py-4 text-right">
-          <div className="flex justify-end gap-2">
+      <td className="px-6 py-4 text-right">
+        <div className="flex justify-end gap-2">
+          {/* Lihat Laporan button (always visible) */}
+          <a
+            href={`/dashboard?periodId=${period.id}`}
+            title="Lihat laporan periode ini"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg border border-slate-200 hover:border-indigo-200 transition-all"
+          >
+            <BarChart2 className="h-3.5 w-3.5" />
+            Laporan
+          </a>
+
+          {isAdmin && (
+            <>
             {!isActive && (
               <button
-                onClick={() => handleSetActive(period.id)}
+                onClick={() => handleSetActive(period)}
                 disabled={isLoading}
                 title="Jadikan periode aktif global"
                 className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-md border border-indigo-200 transition-all hover:shadow-sm"
@@ -197,9 +200,10 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
             >
               <Trash2 className="h-4 w-4" />
             </button>
+            </>
+          )}
           </div>
         </td>
-      )}
     </tr>
   )
 
@@ -397,6 +401,20 @@ export function PeriodClient({ periods, isAdmin }: { periods: Period[], isAdmin:
             </form>
           </div>
         </div>
+      )}
+
+      {/* Period Transition Wizard */}
+      {wizardTargetPeriod && (
+        <PeriodTransitionWizard
+          fromPeriod={activePeriod || null}
+          toPeriod={wizardTargetPeriod}
+          programs={programs}
+          onClose={() => setWizardTargetPeriod(null)}
+          onSuccess={() => {
+            setWizardTargetPeriod(null)
+            router.refresh()
+          }}
+        />
       )}
     </div>
   )

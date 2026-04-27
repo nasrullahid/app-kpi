@@ -363,7 +363,8 @@ export function aggregateByMetricGroup(
         customAbsolute += absTarget
       })
 
-      // NEW: Fallback for programs without custom metrics in this group
+      // Fallback for programs without custom metrics in this group.
+      // Only applies when no relevant custom metric definitions exist to prevent double-counting.
       if (relevantDefs.length === 0) {
         if (group === 'revenue' || keys.includes('revenue')) {
           customAbsolute = prog.monthly_target_rp || 0
@@ -877,11 +878,13 @@ export function buildTargetTrendSeries(
   if (overriddenTargetRevenue === undefined && overriddenTargetUser === undefined) {
     programs.forEach(p => {
       const metrics = p.program_metric_definitions || []
-      const revMetric = metrics.find(m => m.metric_key === 'revenue')
-      const userMetric = metrics.find(m => m.metric_key === 'user_count')
+      const revMetric = metrics.find(m => m.metric_key === 'revenue' || m.metric_group === 'revenue')
+      const userMetric = metrics.find(m => m.metric_key === 'user_count' || m.metric_group === 'user_acquisition')
 
-      totalMonthlyTargetRevenue += (Number(revMetric?.monthly_target) || p.monthly_target_rp || 0)
-      totalMonthlyTargetUser += (Number(userMetric?.monthly_target) || p.monthly_target_user || 0)
+      // Only fall back to legacy fields if NO custom metric definition exists for that group.
+      // This prevents double-counting when createProgram auto-creates metric definitions.
+      totalMonthlyTargetRevenue += revMetric ? (Number(revMetric.monthly_target) || 0) : (p.monthly_target_rp || 0)
+      totalMonthlyTargetUser += userMetric ? (Number(userMetric.monthly_target) || 0) : (p.monthly_target_user || 0)
     })
   }
 

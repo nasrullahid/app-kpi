@@ -38,7 +38,8 @@ export interface DashboardData {
  */
 export async function getDashboardData(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  periodId?: string
 ): Promise<DashboardData> {
   const supabase = createClient()
 
@@ -60,6 +61,7 @@ export async function getDashboardData(
     isAdmin,
     startDate,
     endDate,
+    periodId,
     includePrevious: true
   })
 

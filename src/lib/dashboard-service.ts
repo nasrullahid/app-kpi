@@ -179,16 +179,89 @@ export async function getUnifiedDashboardData(options: {
   const metricValues = metricsResult.data || []
   const milestoneCompletions = milestoneResult.data || []
 
+  // 6b. Check for carry-over settings and merge historical data
+  let allDailyInputs = dailyInputs
+  let allMetricValues = metricValues
+
+  if (programIds.length > 0) {
+    const { data: carrySettings } = await supabase
+      .from('program_period_settings')
+      .select('program_id, carry_over_from_period_id')
+      .eq('period_id', activePeriod.id)
+      .in('program_id', programIds)
+      .not('carry_over_from_period_id', 'is', null)
+
+    if (carrySettings && carrySettings.length > 0) {
+      // Group by from_period_id to batch-fetch efficiently
+      const fromPeriodGroups = new Map<string, string[]>()
+      carrySettings.forEach(s => {
+        if (!s.carry_over_from_period_id) return
+        const list = fromPeriodGroups.get(s.carry_over_from_period_id) || []
+        list.push(s.program_id)
+        fromPeriodGroups.set(s.carry_over_from_period_id, list)
+      })
+
+      // Collect all milestone IDs for carry-over programs (for qualitative programs)
+      const carryProgramIds = carrySettings.map(s => s.program_id)
+      const carryMilestoneIds = programs
+        .filter(p => carryProgramIds.includes(p.id))
+        .flatMap(p => p.program_milestones?.map(m => m.id) || [])
+
+      const historicalFetches = Array.from(fromPeriodGroups.entries()).map(
+        async ([fromPeriodId, progIds]) => {
+          const [histInputs, histMetrics, histMilestones] = await Promise.all([
+            supabase.from('daily_inputs').select('*')
+              .eq('period_id', fromPeriodId)
+              .in('program_id', progIds),
+            supabase.from('daily_metric_values').select('*')
+              .eq('period_id', fromPeriodId)
+              .in('program_id', progIds),
+            // Milestone completions for qualitative carry-over programs
+            carryMilestoneIds.length > 0
+              ? supabase.from('milestone_completions').select('*')
+                  .eq('period_id', fromPeriodId)
+                  .in('milestone_id', carryMilestoneIds)
+              : Promise.resolve({ data: [] }),
+          ])
+          return {
+            inputs: histInputs.data || [],
+            metrics: histMetrics.data || [],
+            milestones: histMilestones.data || [],
+          }
+        }
+      )
+
+      const historicalResults = await Promise.all(historicalFetches)
+      const extraInputs = historicalResults.flatMap(r => r.inputs)
+      const extraMetrics = historicalResults.flatMap(r => r.metrics)
+      const extraMilestones = historicalResults.flatMap(r => r.milestones)
+
+      // Merge — remap period_id to current period for calculator consistency
+      const mergedInputs = extraInputs.map(i => ({ ...i, period_id: activePeriod.id }))
+      const mergedMetrics = extraMetrics.map(m => ({ ...m, period_id: activePeriod.id }))
+      // For milestones: only include completions not already present in the current period
+      const currentMilestoneIds = new Set(milestoneCompletions.map(mc => mc.milestone_id))
+      const mergedMilestones = extraMilestones
+        .filter(mc => mc.is_completed && !currentMilestoneIds.has(mc.milestone_id))
+        .map(mc => ({ ...mc, period_id: activePeriod.id }))
+
+      allDailyInputs = [...dailyInputs, ...mergedInputs as typeof dailyInputs]
+      allMetricValues = [...metricValues, ...mergedMetrics as typeof metricValues]
+      // Extend milestoneCompletions with carry-over completions
+      ;(milestoneCompletions as typeof milestoneCompletions).push(...mergedMilestones as typeof milestoneCompletions)
+    }
+  }
+
   // 6. Indexing for O(1) Lookups in Calculator
   const metricValuesByProgram = new Map<string, MetricValue[]>()
-  metricValues.forEach(mv => {
+  allMetricValues.forEach(mv => {
     const list = metricValuesByProgram.get(mv.program_id) || []
     list.push(mv)
     metricValuesByProgram.set(mv.program_id, list)
   })
 
   const dailyInputsByProgram = new Map<string, DailyInput[]>()
-  dailyInputs.forEach(di => {
+  allDailyInputs.forEach(di => {
     const list = dailyInputsByProgram.get(di.program_id) || []
     list.push(di)
     dailyInputsByProgram.set(di.program_id, list)
@@ -205,8 +278,6 @@ export async function getUnifiedDashboardData(options: {
   const todayIso = new Date().toISOString().split('T')[0]
   
   // Preliminary max date check for pro-rata adjustment
-  const allMetricValues = metricValues || []
-  const allDailyInputs = dailyInputs || []
   const maxMetricDate = allMetricValues.reduce((max, v) => (max === '' || v.date > max ? v.date : max), '')
   const maxInputDate = allDailyInputs.reduce((max, i) => (max === '' || i.date > max ? i.date : max), '')
   const maxAchievementDate = maxMetricDate > maxInputDate ? maxMetricDate : maxInputDate

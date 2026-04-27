@@ -336,7 +336,6 @@ export async function setActivePeriod(id: string): Promise<ActionResponse> {
   if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa mengatur periode aktif.' }
 
   // 1. Set all to inactive
-  // We use a safe target like a dummy ID or just update all is feasible in small datasets
   await supabase.from('periods').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000')
   
   // 2. Set the requested one to active
@@ -347,6 +346,66 @@ export async function setActivePeriod(id: string): Promise<ActionResponse> {
   // Revalidate everything because active period changes global dashboards
   revalidatePath('/', 'layout')
   return { success: true }
+}
+
+/**
+ * Activate a new period while processing wizard decisions:
+ * - 'skip': deactivate the program (is_active = false)
+ * - 'fresh': keep program active, data starts from 0 (default behavior)
+ * - 'carry': keep program active AND save a carry-over record so dashboard
+ *            aggregates data from both old and new periods.
+ */
+export async function activatePeriodWithDecisions(
+  periodId: string,
+  fromPeriodId: string | null,
+  decisions: Record<string, 'skip' | 'fresh' | 'carry'>
+): Promise<ActionResponse> {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { error: 'Hanya admin yang bisa mengatur periode aktif.' }
+
+  // 1. Deactivate programs marked as 'skip'
+  const skipIds = Object.entries(decisions)
+    .filter(([, d]) => d === 'skip')
+    .map(([id]) => id)
+
+  if (skipIds.length > 0) {
+    const { error: skipError } = await supabase
+      .from('programs')
+      .update({ is_active: false })
+      .in('id', skipIds)
+    if (skipError) return { error: `Gagal menonaktifkan program: ${skipError.message}` }
+  }
+
+  // 2. Save carry-over settings for programs marked as 'carry'
+  if (fromPeriodId) {
+    const carryIds = Object.entries(decisions)
+      .filter(([, d]) => d === 'carry')
+      .map(([id]) => id)
+
+    if (carryIds.length > 0) {
+      const carrySettings = carryIds.map(programId => ({
+        program_id: programId,
+        period_id: periodId,
+        carry_over_from_period_id: fromPeriodId,
+      }))
+      const { error: carryError } = await supabase
+        .from('program_period_settings')
+        .upsert(carrySettings, { onConflict: 'program_id,period_id' })
+      if (carryError) console.error('Carry-over save warning:', carryError.message)
+    }
+  }
+
+  // 3. Switch active period
+  await supabase.from('periods').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000')
+  const { error } = await supabase.from('periods').update({ is_active: true }).eq('id', periodId)
+  if (error) return { error: error.message }
+
+  revalidatePath('/', 'layout')
+  return { success: true, data: { skipped: skipIds.length } }
 }
 
 export async function updatePeriod(id: string, data: {
