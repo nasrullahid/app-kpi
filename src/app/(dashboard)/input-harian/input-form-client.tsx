@@ -741,7 +741,7 @@ export function InputFormClient({
                   {(activeProgram?.target_type === 'quantitative' || activeProgram?.target_type === 'hybrid' || activeProgram?.target_type === 'mou') && (
                     <div className="space-y-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100">
                       <div className="flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest">
-                        <Target className="h-3 w-3" /> {activeProgram?.target_type === 'mou' ? 'Capaian MoU' : 'Capaian Utama (Legacy)'}
+                        <Target className="h-3 w-3" /> {activeProgram?.target_type === 'mou' ? 'Capaian MoU' : 'Capaian Utama (Kuantitatif)'}
                       </div>
                       <div className="grid grid-cols-1 gap-6">
                         {(!hasCustomLeads || !hasCustomSigned) && (

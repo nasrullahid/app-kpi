@@ -50,7 +50,7 @@ const KIND_META: Record<ProgramKind, { label: string; color: string; bg: string;
     carryNote: 'Status milestone akan reset. Centang ulang yang sudah selesai jika masih relevan.',
   },
   legacy: {
-    label: 'LEGACY',
+    label: 'Kuantitatif',
     color: '#059669',
     bg: '#ECFDF5',
     icon: <BarChart2 className="h-3 w-3" />,
